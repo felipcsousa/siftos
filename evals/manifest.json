@@ -1,0 +1,80 @@
+{
+  "fixtures": [
+    {
+      "name": "remove-credit-card-trial",
+      "prompt": "should we remove the credit card requirement from trial?",
+      "metricsOverride": "activation-baseline-24",
+      "expectations": {
+        "nextId": "DEC-0043",
+        "validateExit": 0,
+        "auditTotal": 1,
+        "auditErrors": 0,
+        "searchOnboarding": ["DEC-0042"],
+        "showId": "DEC-0042",
+        "lintErrorRules": [],
+        "lintWarningRules": []
+      }
+    },
+    {
+      "name": "google-login",
+      "prompt": "should we build Google login?",
+      "expectations": {
+        "nextId": "DEC-0002",
+        "validateExit": 0,
+        "auditTotal": 1,
+        "auditErrors": 0,
+        "searchGoal": ["DEC-0001"],
+        "lintErrorRules": [],
+        "lintWarningRules": [
+          "missing-review-condition",
+          "conflicting-status",
+          "guardrail-without-baseline"
+        ]
+      }
+    },
+    {
+      "name": "ai-recommendation-engine",
+      "prompt": "we want to build an AI recommendation engine",
+      "expectations": {
+        "nextId": "DEC-0008",
+        "validateExit": 1,
+        "auditTotal": 1,
+        "auditErrors": 1,
+        "lintErrorRules": ["assumption-as-fact"],
+        "lintWarningRules": [
+          "missing-goal",
+          "missing-alternative",
+          "missing-review-condition",
+          "missing-success-metric",
+          "no-dissent"
+        ]
+      }
+    },
+    {
+      "name": "enterprise-config-feature",
+      "prompt": "should we ship self-serve enterprise configuration?",
+      "expectations": {
+        "nextId": "DEC-0019",
+        "validateExit": 0,
+        "auditTotal": 1,
+        "auditErrors": 0,
+        "searchTag": ["DEC-0018"],
+        "lintErrorRules": [],
+        "lintWarningRules": ["metric-without-baseline", "stale-review", "missing-guardrail"]
+      }
+    },
+    {
+      "name": "mobile-app-investment",
+      "prompt": "should we invest in the mobile app?",
+      "expectations": {
+        "nextId": "DEC-0032",
+        "validateExit": 0,
+        "auditTotal": 1,
+        "auditErrors": 0,
+        "auditReviewed": 1,
+        "lintErrorRules": [],
+        "lintWarningRules": ["metric-without-baseline"]
+      }
+    }
+  ]
+}
