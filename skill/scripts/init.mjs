@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SiftOS init — deterministic scaffold of .product/ from assets templates.
-// Never overwrites existing content. The agent drives the interactive
-// context-building questions; this script performs the deterministic half.
+// Never overwrites existing content. The agent drives context-building; this
+// script only creates the canonical files. Automatic hooks remain OFF until
+// the user explicitly chooses a preset.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,13 +19,9 @@ function main() {
     process.exit(1);
   }
 
-  // Nearest git root, else cwd.
   let repoRoot = cwd;
   for (const dir of walkUp(cwd)) {
-    if (existsSync(path.join(dir, ".git"))) {
-      repoRoot = dir;
-      break;
-    }
+    if (existsSync(path.join(dir, ".git"))) { repoRoot = dir; break; }
   }
 
   const productDir = path.join(repoRoot, ".product");
@@ -44,7 +41,7 @@ function main() {
   for (const [target, template] of files) {
     const dest = path.join(productDir, target);
     if (existsSync(dest)) continue;
-    writeFileSync(dest, readAsset(template));
+    writeFileSync(dest, readFileSync(path.join(assets, template), "utf8"));
     created.push(path.relative(repoRoot, dest));
   }
 
@@ -58,7 +55,6 @@ function main() {
           name: "siftos",
           platforms: ["opencode", "codex"],
           linters: { enabled: true },
-          hooks: { preset: "balanced" },
         },
         null,
         2,
@@ -73,7 +69,7 @@ function main() {
       roadmap,
       `# Product Roadmap
 
-Only active bets belong on the roadmap (PRD V2 §92).
+Only active bets belong on the roadmap.
 
 ## NOW
 
@@ -97,15 +93,7 @@ Unknown.
 
   const gitignore = path.join(productDir, ".gitignore");
   if (!existsSync(gitignore)) {
-    writeFileSync(
-      gitignore,
-      `# siftos-ignore-start
-# Disposable runtime + derived indexes (regenerable).
-.runtime/
-.index/
-# siftos-ignore-end
-`,
-    );
+    writeFileSync(gitignore, `# siftos-ignore-start\n.runtime/\n.index/\n# siftos-ignore-end\n`);
     created.push(path.relative(repoRoot, gitignore));
   }
 
@@ -124,10 +112,7 @@ Unknown.
   for (const p of created) console.log(p);
   console.log("");
   console.log("Ready for the first decision.");
-}
-
-function readAsset(name) {
-  return readFileSync(path.join(assets, name), "utf8");
+  console.log("Automatic hooks are OFF until you explicitly choose: advisory | balanced | strict.");
 }
 
 main();
