@@ -1,7 +1,6 @@
 // Shared zero-dependency runtime for Codex/OpenCode lifecycle adapters.
-// Hooks orchestrate; product judgment stays in the SiftOS skill. The core
-// invariant here is authorization: a blocked product intent stays blocked
-// until the user explicitly resolves it.
+// Product judgment stays in the skill; this module owns deterministic policy.
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -11,15 +10,24 @@ export const HOOK_NAMES = [
   "session_start", "prompt_submit", "before_mutation", "after_mutation",
   "turn_stop", "context_compact", "subagent_start", "session_end",
 ];
+const ENFORCEMENTS = new Set(["off", "advisory", "balanced", "strict"]);
+const FAILURE_POLICIES = new Set(["fail_open", "fail_closed"]);
+const PRESETS = new Set(["off", "advisory", "balanced", "strict", "custom"]);
 const AUTHORIZING_RESOLUTIONS = new Set(["prototype", "existing_bet", "build_anyway"]);
-const ACCEPTED_PLUS = new Set(["accepted", "building", "shipped", "measuring", "reviewed"]);
+const POLICY = JSON.parse(readFileSync(new URL("./policy.json", import.meta.url), "utf8"));
+const BUILD_AUTHORIZING_STATUSES = new Set(POLICY.build_authorizing_statuses);
+const SHIP_GATE_STATUSES = new Set(POLICY.ship_gate_statuses);
+const L3_PATTERNS = POLICY.guard.l3.map((value) => new RegExp(value, "i"));
+const L2_PATTERNS = POLICY.guard.l2.map((value) => new RegExp(value, "i"));
+const L1_PATTERNS = POLICY.guard.l1.map((value) => new RegExp(value, "i"));
+const NON_PRODUCT_PATHS = POLICY.guard.non_product_paths.map((value) => new RegExp(value, "i"));
 
 function now() { return new Date().toISOString(); }
 function runtimeFile(root) { return path.join(root, ".product", ".runtime", "session.json"); }
 
 export function defaultRuntime() {
   return {
-    session_id: `hook-${process.pid}`,
+    session_id: randomUUID(),
     turn_id: null,
     prompt: null,
     hook_overrides: {},
@@ -39,14 +47,19 @@ export function loadRuntime(root) {
   try {
     const raw = JSON.parse(readFileSync(file, "utf8"));
     const base = defaultRuntime();
-    const guard = { ...base.guard, ...(raw.guard ?? {}) };
-    if (!guard.status) {
-      guard.status = guard.resolution === "build_anyway" ? "bypassed"
-        : guard.resolution === "prototype" || guard.resolution === "existing_bet" ? "resolved"
-        : guard.level ? "unresolved" : "idle";
+    const rawGuard = raw.guard ?? {};
+    const guard = { ...base.guard, ...rawGuard };
+    // Legacy runtime never carries authorization forward. Old resolution
+    // fields had no intent scope, so migration is intentionally conservative.
+    if (!rawGuard.intent_id || !rawGuard.status) {
+      guard.intent_id = null;
+      guard.status = rawGuard.level ? "unresolved" : "idle";
+      guard.resolution = null;
+      guard.block_issued = Boolean(rawGuard.block_issued);
     }
     return {
-      ...base, ...raw,
+      ...base,
+      ...raw,
       hook_overrides: { ...base.hook_overrides, ...(raw.hook_overrides ?? {}) },
       guard,
       mutation: { ...base.mutation, ...(raw.mutation ?? {}) },
@@ -54,17 +67,19 @@ export function loadRuntime(root) {
       heartbeat: { ...(raw.heartbeat ?? {}) },
       metrics: { ...(raw.metrics ?? {}) },
     };
-  } catch { return defaultRuntime(); }
+  } catch {
+    return defaultRuntime();
+  }
 }
 
 export function saveRuntime(root, state) {
   const dir = path.dirname(runtimeFile(root));
   mkdirSync(dir, { recursive: true });
   const file = runtimeFile(root);
-  const tmp = `${file}.tmp-${process.pid}`;
+  const tmp = `${file}.tmp-${process.pid}-${Date.now()}`;
   writeFileSync(tmp, JSON.stringify(state, null, 2) + "\n");
   try { renameSync(tmp, file); }
-  catch (err) { rmSync(tmp, { force: true }); throw err; }
+  catch (error) { rmSync(tmp, { force: true }); throw error; }
 }
 
 function loadJson(file) {
@@ -72,14 +87,33 @@ function loadJson(file) {
   catch { return null; }
 }
 
-function normalizePreset(value) {
-  return ["off", "advisory", "balanced", "strict", "custom"].includes(value) ? value : null;
+function validHookEntry(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (typeof value.enabled !== "boolean") return false;
+  if (value.enforcement !== undefined && !ENFORCEMENTS.has(value.enforcement)) return false;
+  if (value.failure_policy !== undefined && !FAILURE_POLICIES.has(value.failure_policy)) return false;
+  return true;
 }
+
+/** Mirrors src/config.ts hooksConfigSchema: known per-hook entries require enabled. */
+export function validateHooksBlock(raw) {
+  if (raw === null || raw === undefined) return { valid: true, value: null };
+  if (typeof raw !== "object" || Array.isArray(raw)) return { valid: false, value: null };
+  if (raw.preset !== undefined && !PRESETS.has(raw.preset)) return { valid: false, value: null };
+  for (const name of HOOK_NAMES) {
+    if (raw[name] !== undefined && !validHookEntry(raw[name])) return { valid: false, value: null };
+  }
+  return { valid: true, value: raw };
+}
+
+function normalizePreset(value) { return PRESETS.has(value) ? value : null; }
 
 function presetHook(preset, name) {
   if (preset === "off") return { enabled: false };
-  if (name === "before_mutation") return { enabled: true, enforcement: preset, failure_policy: preset === "strict" ? "fail_closed" : "fail_open" };
-  if (name === "turn_stop") return { enabled: true, enforcement: preset === "strict" ? "strict" : "advisory", failure_policy: "fail_open" };
+  if (name === "before_mutation") {
+    return { enabled: true, enforcement: preset, failure_policy: preset === "strict" ? "fail_closed" : "fail_open" };
+  }
+  if (name === "turn_stop") return { enabled: true, enforcement: preset, failure_policy: "fail_open" };
   if (name === "prompt_submit") return { enabled: true, enforcement: "advisory", failure_policy: "fail_open" };
   return { enabled: true, failure_policy: "fail_open" };
 }
@@ -87,15 +121,20 @@ function presetHook(preset, name) {
 export function effectiveHook(root, name, state = loadRuntime(root)) {
   const repo = loadJson(path.join(root, ".product", "config.json"));
   const global = loadJson(path.join(os.homedir(), ".siftos", "config.json"));
-  const raw = repo?.hooks ?? null;
+  const validation = validateHooksBlock(repo?.hooks ?? null);
+  if (!validation.valid) {
+    return { enabled: false, enforcement: "off", failure_policy: "fail_open", config_error: "invalid repository hooks config" };
+  }
+  const raw = validation.value;
   const repoPreset = normalizePreset(raw?.preset);
   const globalPreset = normalizePreset(global?.default_hook_preset);
+  const explicitEntries = HOOK_NAMES.some((hookName) => raw?.[hookName] !== undefined);
   let base;
-  if (repoPreset === "custom") base = { enabled: false };
+  if (repoPreset === "custom" || (!repoPreset && explicitEntries)) base = raw?.[name] ? { ...raw[name] } : { enabled: false };
   else if (repoPreset) base = presetHook(repoPreset, name);
   else if (globalPreset && globalPreset !== "custom") base = presetHook(globalPreset, name);
   else base = { enabled: false };
-  if (raw?.[name] && typeof raw[name] === "object") base = { ...base, ...raw[name] };
+  if (repoPreset && repoPreset !== "custom" && raw?.[name]) base = { ...base, ...raw[name] };
   if (state.hook_overrides?.[name]) base = { ...base, ...state.hook_overrides[name] };
   return base;
 }
@@ -123,7 +162,7 @@ function decisionIdFromPrompt(prompt) {
 export function classifyCandidate(prompt) {
   const text = String(prompt ?? "").toLowerCase();
   if (!text.trim()) return "unknown";
-  if (/\b(add|introduce|launch|remove|change|redesign|enable|disable|monetiz|pricing|subscription|referral|onboard|login|oauth|notification|export|workspace|team|permission|marketplace|paywall)\b/.test(text)) return "obvious_product";
+  if (/\b(add|introduce|launch|remove|change|redesign|enable|disable|monetiz|pricing|subscription|referral|onboard|oauth|notification|marketplace|paywall)\b/.test(text)) return "obvious_product";
   if (/\b(fix|refactor|rename variable|failing test|lint|format|dependency upgrade|type error)\b/.test(text)) return "technical";
   if (/\b(user|customer|flow|screen|cta|copy|behavior|experience|feature)\b/.test(text)) return "possible_product";
   return "unknown";
@@ -147,18 +186,24 @@ export function startTurn(root, { turnId, prompt }) {
     if (resolution === "build_anyway") state.guard.status = "bypassed";
     else if (resolution === "prototype") state.guard.status = "resolved";
     else if (resolution === "existing_bet") {
-      const idFromPrompt = decisionIdFromPrompt(prompt);
+      const decisionId = decisionIdFromPrompt(prompt);
       const { decisions } = loadAll(root);
-      const decision = idFromPrompt ? decisions.find((d) => d.id === idFromPrompt) : null;
-      if (decision && ACCEPTED_PLUS.has(decision.status)) {
+      const decision = decisionId ? decisions.find((item) => item.id === decisionId) : null;
+      if (decision && BUILD_AUTHORIZING_STATUSES.has(decision.status)) {
         state.active_bet = decision.id;
         state.guard.status = "resolved";
       }
     }
-    // shape/validate/reconsider intentionally remain unresolved for
-    // production mutation. SiftOS-internal `.product/` writes are exempt.
   }
   state.heartbeat.prompt_submit = now();
+  saveRuntime(root, state);
+  return state;
+}
+
+export function startSession(root, sessionId) {
+  const state = defaultRuntime();
+  state.session_id = String(sessionId || state.session_id);
+  state.heartbeat.session_start = now();
   saveRuntime(root, state);
   return state;
 }
@@ -172,29 +217,46 @@ function strings(value, out = []) {
 
 export function toolStrings(toolInput) { return strings(toolInput ?? {}); }
 
-function readOnlyShell(command) {
+function shellEffect(command) {
   const cmd = String(command ?? "").trim();
-  if (!cmd) return true;
-  if (/[>|;&]|\brm\b|\bmv\b|\bcp\b|\bmkdir\b|\btouch\b|\bsed\s+-i\b|\bnpm\s+(install|i)\b|\bpnpm\s+add\b|\byarn\s+add\b|\bgit\s+(checkout|reset|clean|commit|add|restore)\b/.test(cmd)) return false;
-  return /^(pwd|ls|find|cat|head|tail|rg|grep|git\s+(status|diff|log|show)|node\s+--version|npm\s+test|npm\s+run\s+(test|typecheck|build))\b/.test(cmd);
+  if (!cmd) return "read";
+  if (/^(?:npm|pnpm|yarn)\s+(?:test|run\s+(?:test|typecheck))(?:\s|$)/i.test(cmd)) return "verification";
+  if (/^(?:pwd|ls|find|cat|head|tail|rg|grep)(?:\s|$)/i.test(cmd)) return "read";
+  if (/^git\s+(?:status|diff|log|show)(?:\s|$)/i.test(cmd)) return "read";
+  if (/^(?:node|npm|pnpm|yarn)\s+--version(?:\s|$)/i.test(cmd)) return "read";
+  if (/\b(?:npm|pnpm|yarn)\s+(?:install|i|add|run\s+build|build)\b/i.test(cmd)) return "mutation";
+  if (/[>|;&]/.test(cmd)) return "mutation";
+  if (/\b(?:rm|mv|cp|mkdir|touch)\b|\bsed\s+-i\b|\bgit\s+(?:checkout|reset|clean|commit|add|restore)\b/i.test(cmd)) return "mutation";
+  return "unknown";
 }
 
 export function classifyToolEffect(toolName, toolInput) {
   const tool = String(toolName ?? "").toLowerCase();
   const values = toolStrings(toolInput);
   const joined = values.join(" ").toLowerCase();
-  const internal = joined.includes(".product/") || joined.includes(".agents/skills/siftos/") || joined.includes(".siftos");
-  if (["read", "grep", "glob", "search", "view", "list"].includes(tool)) return "read";
-  if (["write", "edit", "apply_patch", "apply", "patch", "multiedit"].includes(tool)) return internal ? "siftos_internal" : "mutation";
-  if (["bash", "shell", "exec"].includes(tool)) return readOnlyShell(values[0]) ? "read" : "mutation";
+  if (["read", "grep", "glob", "search", "show", "view", "cat", "ls", "list", "status", "audit", "context"].includes(tool)) return "read";
+  if (["write", "edit", "apply_patch", "apply", "patch", "multiedit", "rename", "insert", "delete"].includes(tool)) {
+    const internal = joined.includes(".product/") || joined.includes(".agents/skills/siftos/") || joined.includes(".siftos");
+    return internal ? "siftos_internal" : "mutation";
+  }
+  if (["bash", "shell", "exec"].includes(tool)) return shellEffect(values[0] ?? joined);
   return "unknown";
 }
 
+function pathLike(value) { return /[\\/]|\.[A-Za-z0-9]{1,8}(?:\s|$)/.test(value); }
+function nonProductTarget(value) {
+  const normalized = String(value).replace(/\\/g, "/").toLowerCase();
+  return NON_PRODUCT_PATHS.some((pattern) => pattern.test(normalized));
+}
+
 export function classifyLevel(state, toolName, toolInput) {
-  const text = `${state.prompt ?? ""}\n${String(toolName ?? "")}\n${toolStrings(toolInput).join(" ")}`.toLowerCase();
-  if (/pricing|billing|subscription|\bplans?\b|paywall|\bicp\b|account model|marketplace|payment|stripe|business model/.test(text)) return "L3";
-  if (/referral|invite|export|notification|oauth|login|integration|onboard|permission|workspace|team|trial|activation/.test(text)) return "L2";
-  if (/\bcopy\b|\bcta\b|label|tooltip|\.css|spacing|button text/.test(text)) return "L1";
+  const values = toolStrings(toolInput);
+  const targets = values.filter(pathLike);
+  if (targets.length > 0 && targets.every(nonProductTarget)) return "L0";
+  const text = `${state.prompt ?? ""}\n${String(toolName ?? "")}\n${values.join(" ")}`.toLowerCase();
+  if (L3_PATTERNS.some((pattern) => pattern.test(text))) return "L3";
+  if (L2_PATTERNS.some((pattern) => pattern.test(text))) return "L2";
+  if (L1_PATTERNS.some((pattern) => pattern.test(text))) return "L1";
   if (state.candidate === "technical") return "L0";
   return state.candidate === "obvious_product" || state.candidate === "possible_product" ? "L2" : "L0";
 }
@@ -212,10 +274,12 @@ function verdict(level, enforcement) {
 export function beforeMutation(root, { toolName, toolInput }) {
   const state = loadRuntime(root);
   const hook = effectiveHook(root, "before_mutation", state);
-  if (!hook.enabled) return { allowed: true, disabled: true, level: null, verdict: "ALLOW", message: "SiftOS Product Guard is disabled." };
+  if (!hook.enabled) {
+    return { allowed: true, disabled: true, level: null, verdict: "ALLOW", message: hook.config_error ? `SiftOS hooks disabled: ${hook.config_error}. Run siftos doctor.` : "" };
+  }
   state.heartbeat.before_mutation = now();
   const effect = classifyToolEffect(toolName, toolInput);
-  if (effect === "read" || effect === "siftos_internal") {
+  if (effect === "read" || effect === "verification" || effect === "siftos_internal") {
     saveRuntime(root, state);
     return { allowed: true, level: "L0", verdict: "ALLOW", message: "" };
   }
@@ -232,7 +296,7 @@ export function beforeMutation(root, { toolName, toolInput }) {
   }
   const gate = verdict(level, hook.enforcement ?? "advisory");
   if (gate === "ALLOW" || gate === "ADVISE") {
-    state.mutation.started = true;
+    state.mutation.started = effect === "mutation" || effect === "unknown";
     saveRuntime(root, state);
     const message = gate === "ADVISE" || hook.enforcement === "advisory"
       ? `SiftOS advisory: ${level} product change detected; no accepted Bet is attached.` : "";
@@ -244,14 +308,15 @@ export function beforeMutation(root, { toolName, toolInput }) {
   state.metrics.guard_blocked = (state.metrics.guard_blocked ?? 0) + 1;
   saveRuntime(root, state);
   const message = firstBlock
-    ? `SiftOS Product Guard: ${level} material product change is unresolved. Before modifying product code, resolve with prototype, existing_bet (accepted+), or build_anyway. shape/validate/reconsider may run inside .product/ but do not authorize production mutation.`
-    : `SiftOS Product Guard: this product intent is still unresolved. Retrying the mutation does not bypass the gate; choose prototype, an accepted existing Bet, or build_anyway.`;
+    ? `SiftOS Product Guard: ${level} material product change is unresolved. Resolve with prototype, existing_bet (accepted+), or build_anyway. shape/validate/reconsider do not authorize production mutation.`
+    : `SiftOS Product Guard: this product intent is still unresolved. Retrying the mutation does not bypass the gate.`;
   return { allowed: false, level, verdict: gate, message };
 }
 
-export function recordMutation(root, { toolInput }) {
+export function recordMutation(root, { toolName, toolInput }) {
   const state = loadRuntime(root);
   if (!effectiveHook(root, "after_mutation", state).enabled) return state;
+  if (classifyToolEffect(toolName, toolInput) !== "mutation") return state;
   const files = toolStrings(toolInput).filter((value) => /[\\/]|\.[A-Za-z0-9]{1,8}$/.test(value));
   for (const file of files) if (!state.mutation.files.includes(file)) state.mutation.files.push(file);
   state.mutation.started = true;
@@ -264,7 +329,6 @@ function readContext(root, name) {
   try { return readFileSync(path.join(root, ".product", name), "utf8").trim(); }
   catch { return ""; }
 }
-
 function trimContext(text, max = 700) { return text.length <= max ? text : `${text.slice(0, max)}…`; }
 
 export function buildCapsule(root, state = loadRuntime(root)) {
@@ -275,7 +339,7 @@ export function buildCapsule(root, state = loadRuntime(root)) {
   }
   if (state.active_bet) {
     const { decisions } = loadAll(root);
-    const bet = decisions.find((d) => d.id === state.active_bet);
+    const bet = decisions.find((item) => item.id === state.active_bet);
     if (bet) {
       lines.push("", `Active Bet: ${bet.id} — ${bet.title} (${bet.status})`);
       const scope = sectionItems(bet, "Scope");
@@ -288,35 +352,60 @@ export function buildCapsule(root, state = loadRuntime(root)) {
 }
 
 function hasContent(items) { return Array.isArray(items) && items.length > 0; }
+function bodyText(decision) { return Object.values(decision.body ?? {}).flat().join("\n").toLowerCase(); }
 
+/** Must stay semantically identical to src/shipgate.ts; evals assert parity. */
 export function deterministicShipGate(root, decision) {
-  if (!ACCEPTED_PLUS.has(decision.status)) return { result: "NOT_REQUIRED", findings: [] };
+  if (!SHIP_GATE_STATUSES.has(decision.status)) return { result: "NOT_REQUIRED", findings: [] };
   const findings = [];
   const error = (rule, message) => findings.push({ severity: "ERROR", rule, message });
   const warn = (rule, message) => findings.push({ severity: "WARNING", rule, message });
   if (!hasContent(sectionItems(decision, "Target User"))) warn("missing-target-user", "No target user defined.");
-  if (!decision.goal && !hasContent(sectionItems(decision, "Goal")) && !hasContent(sectionItems(decision, "Context"))) error("missing-problem", "No problem/goal defined.");
-  if (!hasContent(sectionItems(decision, "Expected Outcome")) && !hasContent(sectionItems(decision, "Primary Metric"))) error("missing-outcome", "No expected outcome/metric defined.");
-  if (!hasContent(sectionItems(decision, "Revisit Condition"))) warn("missing-review-condition", "No revisit condition defined.");
-  if (!hasContent(sectionItems(decision, "Scope"))) warn("missing-scope", "No scope defined.");
+  if (!decision.goal && !hasContent(sectionItems(decision, "Goal")) && !hasContent(sectionItems(decision, "Context"))) error("missing-problem", "No problem/goal defined — a bet ships against a problem.");
+  const hasExpected = hasContent(sectionItems(decision, "Expected Outcome"));
+  const hasMetric = hasContent(sectionItems(decision, "Primary Metric"));
+  if (!hasExpected && !hasMetric) {
+    error("missing-expected-outcome", "No expected outcome or primary metric recorded.");
+    error("missing-metric", "No primary metric or expected outcome to measure.");
+  } else if (!hasExpected) warn("missing-expected-outcome", "No quantified expected outcome — only a primary metric.");
+  const expectedText = sectionItems(decision, "Expected Outcome").join(" ");
+  if (!/\d/.test(expectedText)) warn("missing-success-threshold", "Success threshold is not quantified.");
+  const metrics = readContext(root, "METRICS.md");
+  const hasBaseline = /baseline:\s*(?!unknown\b)[^\n]*\S/i.test(metrics);
+  if (!hasBaseline && !/\d/.test(expectedText)) warn("missing-baseline", "No baseline — relative success cannot be evaluated.");
+  if (!/\b(instrument|analytics|event|track)\b/i.test(bodyText(decision))) warn("missing-instrumentation", "No instrumentation/measurement plan detected.");
   if (!hasContent(sectionItems(decision, "Guardrails"))) warn("missing-guardrail", "No guardrails defined.");
-  if (findings.some((f) => f.severity === "ERROR")) return { result: "FAIL", findings };
+  if (!hasContent(sectionItems(decision, "Revisit Condition"))) warn("missing-review-condition", "No revisit condition defined.");
+  if (!hasContent(sectionItems(decision, "Scope"))) warn("missing-scope", "No scope defined — scope drift cannot be checked.");
+  if (findings.some((finding) => finding.severity === "ERROR")) return { result: "FAIL", findings };
   return { result: findings.length ? "PASS_WITH_WARNINGS" : "PASS", findings };
+}
+
+function deriveActiveBet(decisions) {
+  const building = decisions.filter((decision) => decision.status === "building");
+  return building.length === 1 ? building[0] : null;
 }
 
 export function closeout(root) {
   const state = loadRuntime(root);
   const hook = effectiveHook(root, "turn_stop", state);
   state.heartbeat.turn_stop = now();
-  if (!hook.enabled || !state.mutation.started || !state.active_bet) {
+  if (!hook.enabled || !state.mutation.started) {
     saveRuntime(root, state);
     return { continue: false, message: "" };
   }
   const { decisions } = loadAll(root);
-  const bet = decisions.find((d) => d.id === state.active_bet);
+  let bet = state.active_bet ? decisions.find((item) => item.id === state.active_bet) : null;
+  if (!bet) {
+    bet = deriveActiveBet(decisions);
+    if (bet) state.active_bet = bet.id;
+  }
   if (!bet) {
     saveRuntime(root, state);
-    return { continue: false, message: `SiftOS closeout: active Bet ${state.active_bet} was not found.` };
+    return {
+      continue: false,
+      message: "SiftOS closeout advisory: implementation mutations occurred but no unique active building Bet is attached. Run /siftos ship manually when a Bet is known.",
+    };
   }
   const gate = deterministicShipGate(root, bet);
   state.ship_gate = {
@@ -326,14 +415,11 @@ export function closeout(root) {
     continuations: state.ship_gate.continuations ?? 0,
   };
   const needsAttention = gate.result === "FAIL" || gate.result === "PASS_WITH_WARNINGS";
-  const mayContinue = hook.enforcement !== "advisory" && needsAttention && (state.ship_gate.continuations ?? 0) < 1;
+  const mayContinue = hook.enforcement !== "advisory" && hook.enforcement !== "off" && needsAttention && (state.ship_gate.continuations ?? 0) < 1;
   if (mayContinue) state.ship_gate.continuations = (state.ship_gate.continuations ?? 0) + 1;
   saveRuntime(root, state);
-  const details = gate.findings.map((f) => `${f.severity} ${f.rule}: ${f.message}`).join("; ");
-  return {
-    continue: mayContinue,
-    message: needsAttention ? `SiftOS Ship Gate ${gate.result} for ${bet.id}. ${details}` : "",
-  };
+  const details = gate.findings.map((finding) => `${finding.severity} ${finding.rule}: ${finding.message}`).join("; ");
+  return { continue: mayContinue, message: needsAttention ? `SiftOS Ship Gate ${gate.result} for ${bet.id}. ${details}` : "" };
 }
 
 export function clearTurn(root) {
@@ -349,8 +435,7 @@ export function clearTurn(root) {
 }
 
 export function clearSession(root) {
-  const state = loadRuntime(root);
-  state.hook_overrides = {};
+  const state = defaultRuntime();
   state.heartbeat.session_end = now();
   saveRuntime(root, state);
 }
