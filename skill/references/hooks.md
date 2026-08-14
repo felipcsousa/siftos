@@ -1,64 +1,136 @@
-# Hooks — user-controlled automation (PRD V2)
+# Hooks — user-controlled automation
 
-SiftOS can observe and, only when configured, gate the coding lifecycle.
-Every hook is independently: **Installed** (adapter exists) · **Enabled**
-(configuration) · **Observed** (runtime saw it fire). Installed does not
-mean enabled; enabled does not mean active.
+SiftOS can observe and, only when configured, gate parts of the coding
+lifecycle. Every hook is independently **Installed** (real adapter capability),
+**Enabled** (user config), and **Observed** (runtime saw it execute).
+
+Installing or initializing SiftOS never enables automatic hooks. Missing
+`hooks` configuration means automatic mode is off.
 
 ## Policy
 
-- Repository: `.product/config.json` → `hooks` (preset or per-hook).
-- Presets: `off`, `advisory` (never blocks), `balanced` (default for new
-  repos; gates L2/L3 once), `strict` (hard gates), `custom`.
-- Session override: `.product/.runtime/session.json` — highest
-  precedence, expires at session end, never touches repository config.
-- Global default: `~/.siftos/config.json` → `default_hook_preset`.
+- Repository: `.product/config.json`
+- Session override: `.product/.runtime/session.json` (highest precedence)
+- Global default: `~/.siftos/config.json`
+- Presets: `off`, `advisory`, `balanced`, `strict`, `custom`
 
-Read the effective policy with `siftos hooks` (or
-`scripts/hooks.mjs`). Disabled means disabled — never run a disabled hook.
+Read effective state with `siftos hooks`. Disabled means disabled.
 
-## Hook behaviors (agent-executed)
+## Product Guard invariant
 
-| Hook | When | Behavior |
-| --- | --- | --- |
-| `session_start` | session start | Inject the Product Context Capsule: product, current objective, constraint, active bet, guard preset. |
-| `prompt_submit` | user prompt | Cheap intent triage: `technical` / `possible_product` / `obvious_product` / `unknown`. Never blocks. |
-| `before_mutation` | before write/edit/patch/mutating shell | Product Guard: classify L0–L3, apply the gate (see below). Reads are never gated. |
-| `after_mutation` | after a mutation | Record the changed-file footprint in runtime state. No LLM per mutation. Drift detection runs deterministically via `siftos scope <DEC> <files...>`. |
-| `turn_stop` | agent tries to finish | Closeout: run Ship Gate when material work is done (at most one continuation in balanced). |
-| `context_compact` | compaction | Persist/restore the capsule: active bet, guard resolution, scope, ship state. |
-| `subagent_start` | implementation subagent | Pass the bet capsule: active bet, goal, scope, non-goals, measurement requirements. |
-| `session_end` | session end | Lightweight flush: clear session overrides, bump local metrics. No critical enforcement. |
-
-## Product Guard gate (deterministic)
+The Guard is scoped to the current user turn/product intent.
 
 ```text
-Level        balanced                  strict
-L0 technical ALLOW                     ALLOW
-L1 minor     ALLOW                     ADVISE (inspect)
-L2 material  BLOCK ONCE → resolution   REQUIRE RESOLUTION
-L3 strategic BLOCK ONCE → resolution   REQUIRE RESOLUTION
-UNKNOWN      ALLOW                     REQUIRE RESOLUTION
+blocked intent
+    ↓ retry mutation
+still blocked
+    ↓ explicit authorization
+prototype | accepted existing_bet | build_anyway
+    ↓
+ALLOW
 ```
 
-Advisory: recommend, always ALLOW. Block-once: one guard block per
-mutation; after the user resolves, proceed.
+`block_issued` only suppresses repetitive explanation. It never authorizes a
+second mutation attempt. `shape`, `validate`, and `reconsider` are legitimate
+next steps but leave production mutation unresolved.
 
-Resolutions: `shape` · `validate` · `prototype` · `existing_bet` ·
-`reconsider` · `build_anyway`. `build_anyway` is always available — the
-human owns the decision.
+## Codex adapter
 
-## Script-executed hooks (Codex/OpenCode adapters)
+Codex uses native lifecycle contracts:
 
-`scripts/hook-codex.mjs` maps logical events to platform hooks
-(PreToolUse → before_mutation, UserPromptSubmit → prompt_submit,
-SessionStart → session_start, PostToolUse → after_mutation, Stop →
-turn_stop). Script hooks have no LLM: classification uses the
-deterministic fallback; the gate is always deterministic. On error apply
-the hook's `failure_policy` (`fail_open` default, `fail_closed` in
-strict before_mutation) and never fail silently.
+| Logical behavior | Codex hook | Behavior |
+| --- | --- | --- |
+| Session context | `SessionStart` | returns Product Context Capsule through `additionalContext` |
+| Prompt intake | `UserPromptSubmit` | starts a fresh turn/intent and returns advisory context |
+| Mutation gate | `PreToolUse` | returns `permissionDecision: deny` for unresolved gated changes |
+| Mutation tracking | `PostToolUse` | records disposable changed-file footprint |
+| Compaction | `PreCompact` | persists runtime state; the next SessionStart can reload repository context |
+| Closeout | `Stop` | may return `{decision: "block", reason}` once when Ship Gate needs attention |
+| Cleanup | `SessionEnd` | clears session-only overrides/state as appropriate |
 
-## Configuration safety
+Never emulate Codex denial with a magic exit code when the harness provides a
+permission-decision contract. Never create a Stop loop; honor
+`stop_hook_active` and the one-continuation runtime limit.
 
-Changing hook settings never mutates decisions, bets, evidence, strategy,
-or roadmap (PRD §107). Hooks affect automation, not canonical truth.
+## OpenCode adapter
+
+OpenCode installs a real repository-local plugin:
+
+```text
+.opencode/plugins/siftos.js
+```
+
+with the implementation in:
+
+```text
+.agents/skills/siftos/adapters/opencode-plugin.js
+```
+
+Supported native lifecycle points:
+
+| Logical behavior | OpenCode plugin surface |
+| --- | --- |
+| Before mutation | `tool.execute.before` (throws to block) |
+| After mutation | `tool.execute.after` |
+| Session observation | plugin `event` session lifecycle |
+| Compaction context | `experimental.session.compacting` |
+| Closeout | `session.idle`, advisory only |
+
+OpenCode does **not** currently expose documented 1:1 equivalents for Codex
+`UserPromptSubmit` context injection or Stop-style forced continuation. Do not
+claim those are implemented. Product Guard still protects mutations through
+`tool.execute.before`; explicit SiftOS workflows remain fully available.
+
+## Preset behavior
+
+```text
+             advisory       balanced                  strict
+L0           ALLOW          ALLOW                     ALLOW
+L1           ALLOW          ALLOW                     ADVISE
+L2           ALLOW+advice   BLOCK until resolution    REQUIRE resolution
+L3           ALLOW+advice   BLOCK until resolution    REQUIRE resolution
+UNKNOWN      ALLOW          ALLOW                     REQUIRE resolution
+```
+
+A user bypass is always available by default because Product Guard is product
+judgment tooling, not an organizational security boundary.
+
+## Runtime state
+
+`.product/.runtime/session.json` is disposable and may contain:
+
+```text
+session_id
+turn_id
+prompt/candidate
+current guard intent + resolution
+active_bet
+mutation footprint
+Ship Gate closeout state
+hook heartbeat
+session overrides
+```
+
+Canonical decisions/evidence/strategy never live only in runtime state.
+
+## Failure policy
+
+- `advisory` / `balanced`: fail open by default, with visible diagnostic.
+- `strict before_mutation`: may fail closed.
+- A hook failure must never silently masquerade as successful enforcement.
+
+## Capability honesty
+
+`siftos doctor` must distinguish:
+
+```text
+skill available
+adapter installed
+hook enabled
+hook observed
+```
+
+A directory called `.opencode/` is not evidence of an installed OpenCode
+adapter. A hooks JSON file is not proof that every logical hook is supported.
+Doctor reports real artifacts and observed heartbeats, not intended
+architecture.
