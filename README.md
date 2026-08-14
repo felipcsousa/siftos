@@ -155,12 +155,17 @@ Presets:
 | --- | --- |
 | `off` | Manual SiftOS only. |
 | `advisory` | Observe/recommend, never block. |
-| `balanced` | Gate unresolved L2/L3 production mutations. |
+| `balanced` | Gate unresolved L2/L3 mutations; Codex closeout may request one continuation. |
 | `strict` | Stronger gating, including unknown mutations where applicable. |
 | `custom` | Any per-hook combination. |
 
 Config precedence is session override → repository config → global default →
 preset. `Build anyway` remains available because the human owns the decision.
+
+Known per-hook entries are schema-validated and must include `enabled`. A
+malformed hook block is never partially interpreted. `siftos hooks` / `doctor`
+report the configuration error, and the `before_mutation` boundary fails closed
+until the policy is unambiguous; non-critical lifecycle hooks remain inert.
 
 ### Product Guard semantics
 
@@ -171,11 +176,20 @@ authorizing resolution exists**. Retrying a tool call is never authorization.
 Authorizing resolutions:
 
 - `prototype`
-- `existing_bet` pointing to an accepted+ PDR
+- `existing_bet` pointing to an active `accepted`, `building`, `shipped` or
+  `measuring` PDR/Bet
 - `build_anyway`
 
 `shape`, `validate` and `reconsider` are valid next steps and may update
 `.product/`, but they do **not** silently authorize production mutation.
+Manual Guard calls are independent intents unless the caller intentionally
+reuses an explicit `--turn-id`, so one manual bypass is not sticky.
+
+The deterministic fallback also distinguishes mutation effect from product
+level: tests/docs/examples/fixtures are non-product targets, `npm test` and
+typecheck are verification, while `npm run build` is a mutation because it can
+write artifacts. The TypeScript core and standalone hook runtime consume the
+same policy data and are covered by parity evals.
 
 ### Harness capability matrix
 
@@ -195,17 +209,29 @@ than claimed as perfect parity.
 Codex uses the harness JSON contracts for context injection,
 `PreToolUse.permissionDecision`, and `Stop` continuation. OpenCode installs a
 real repository plugin under `.opencode/plugins/siftos.js` using documented
-before/after tool hooks, session events and compaction context. When exact
-parity is unavailable, `siftos doctor` reports the real installed/observed
-state instead of inventing capability.
+before/after tool hooks, session events and compaction context. OpenCode starts
+a fresh runtime scope on each observed `session.created`; at idle, SiftOS can
+use a unique `building` Bet when one exists or explicitly report that mutations
+occurred without a uniquely attachable Bet. When exact parity is unavailable,
+`siftos doctor` reports the real installed/observed state instead of inventing
+capability.
+
+`siftos install` preserves non-SiftOS entries already present in
+`.codex/hooks.json`, refuses to overwrite an unrelated
+`.opencode/plugins/siftos.js`, and replaces its own skill directory on reinstall
+so removed package files do not survive as stale artifacts.
 
 ## Ship Gate
 
-`siftos ship <DEC-XXXX>` checks whether an accepted+ Bet has enough product
-state to be measured: target user, problem/goal, expected outcome/metric,
-measurement readiness, guardrails, revisit condition and scope. It controls
-SiftOS lifecycle state; it is **not** deployment authorization or a security
-boundary.
+`siftos ship <DEC-XXXX>` and automatic closeout share the same deterministic
+status policy and checks. The gate applies to active `accepted`, `building`,
+`shipped` and `measuring` Bets; `reviewed` and `superseded` are historical/
+terminal states and return `NOT_REQUIRED`.
+
+Checks include target user, problem/goal, expected outcome/metric, success
+threshold, baseline, instrumentation, guardrails, revisit condition and scope.
+It controls SiftOS lifecycle state; it is **not** deployment authorization or a
+security boundary.
 
 ## Deterministic linters
 
@@ -246,13 +272,17 @@ tests.
 
 Doctor is deliberately adversarial. It distinguishes:
 
+- core/manual health from lifecycle-automation health;
 - skill compatibility from lifecycle-adapter installation;
 - installed hooks from enabled hooks;
 - enabled hooks from observed hooks;
-- scaffold files from useful product context.
+- scaffold files from useful product context;
+- valid hook configuration from ambiguous/malformed policy.
 
 A directory full of `Unknown.` is a valid scaffold but not a healthy product
-context.
+context. Conversely, a deliberately manual-only repository can be healthy even
+without Codex/OpenCode lifecycle adapters; automation is reported separately as
+`off`, `healthy` or `degraded`.
 
 ## Security
 
