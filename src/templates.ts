@@ -174,11 +174,39 @@ A decision file itself records inline evidence with provenance:
 
 export const CONFIG_TEMPLATE = JSON.stringify(
   {
-    version: 1,
+    version: 2,
     name: "siftos",
     platforms: ["opencode", "codex"],
     linters: { enabled: true },
+    // PRD V2 §43: minimal until customized. New repositories default to
+    // `balanced`; upgraded v0.2 repositories keep hooks absent (disabled)
+    // until the user explicitly chooses a preset (PRD V2 §45/§186).
+    hooks: { preset: "balanced" },
   },
   null,
   2,
 ) + "\n";
+
+export const ROADMAP_TEMPLATE = `# Product Roadmap
+
+Only active bets belong on the roadmap (PRD V2 §92). A bet is a product
+investment under uncertainty; keep it here while it is being shaped,
+validated, built, or measured.
+
+## NOW
+
+Unknown.
+
+## NEXT
+
+Unknown.
+
+## LATER
+
+Unknown.
+
+## NOT NOW
+
+Unknown.
+`;
+

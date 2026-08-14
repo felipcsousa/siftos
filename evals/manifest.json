@@ -9,7 +9,9 @@
         "validateExit": 0,
         "auditTotal": 1,
         "auditErrors": 0,
-        "searchOnboarding": ["DEC-0042"],
+        "searchOnboarding": [
+          "DEC-0042"
+        ],
         "showId": "DEC-0042",
         "lintErrorRules": [],
         "lintWarningRules": []
@@ -23,7 +25,9 @@
         "validateExit": 0,
         "auditTotal": 1,
         "auditErrors": 0,
-        "searchGoal": ["DEC-0001"],
+        "searchGoal": [
+          "DEC-0001"
+        ],
         "lintErrorRules": [],
         "lintWarningRules": [
           "missing-review-condition",
@@ -40,13 +44,16 @@
         "validateExit": 1,
         "auditTotal": 1,
         "auditErrors": 1,
-        "lintErrorRules": ["assumption-as-fact"],
+        "lintErrorRules": [
+          "assumption-as-fact"
+        ],
         "lintWarningRules": [
           "missing-goal",
           "missing-alternative",
           "missing-review-condition",
           "missing-success-metric",
-          "no-dissent"
+          "no-dissent",
+          "missing-wwcm"
         ]
       }
     },
@@ -58,9 +65,15 @@
         "validateExit": 0,
         "auditTotal": 1,
         "auditErrors": 0,
-        "searchTag": ["DEC-0018"],
+        "searchTag": [
+          "DEC-0018"
+        ],
         "lintErrorRules": [],
-        "lintWarningRules": ["metric-without-baseline", "stale-review", "missing-guardrail"]
+        "lintWarningRules": [
+          "metric-without-baseline",
+          "stale-review",
+          "missing-guardrail"
+        ]
       }
     },
     {
@@ -73,7 +86,9 @@
         "auditErrors": 0,
         "auditReviewed": 1,
         "lintErrorRules": [],
-        "lintWarningRules": ["metric-without-baseline"]
+        "lintWarningRules": [
+          "metric-without-baseline"
+        ]
       }
     }
   ]

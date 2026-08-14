@@ -1,6 +1,6 @@
 import type { Decision, LintContext, LintFinding, LintRule } from "./types.js";
 
-const ACCEPTED_PLUS = ["accepted", "shipped", "reviewed", "superseded"];
+const ACCEPTED_PLUS = ["accepted", "building", "shipped", "measuring", "reviewed", "superseded"];
 
 function hasContent(items: string[] | undefined): boolean {
   return (items ?? []).length > 0;
@@ -113,6 +113,55 @@ export const LINTERS: LintRule[] = [
           "no-dissent",
           "WARNING",
           "No strongest argument against recorded (dissent is required).",
+        ),
+      ];
+    }
+    return [];
+  },
+
+  function missingSVT(ctx) {
+    const d = ctx.decision;
+    if ((d.status === "validating" || d.status === "ready") && !hasContent(section(d, "SVT"))) {
+      return [
+        finding(
+          "missing-svt",
+          "WARNING",
+          "A validating/ready bet must define its Smallest Valuable Test (SVT).",
+        ),
+      ];
+    }
+    return [];
+  },
+
+  function missingScope(ctx) {
+    const d = ctx.decision;
+    // building|measuring only: v0.2-era `shipped` records have no Scope
+    // section by definition, so gating shipped would change their lint
+    // result. The Ship Gate still warns missing-scope for shipped.
+    if (
+      (d.status === "building" || d.status === "measuring") &&
+      hasContent(section(d, "Scope")) === false
+    ) {
+      return [
+        finding(
+          "missing-scope",
+          "WARNING",
+          "A building/shipped/measuring bet must define its scope.",
+        ),
+      ];
+    }
+    return [];
+  },
+
+  function missingWWCM(ctx) {
+    const d = ctx.decision;
+    const needsFalsifiability = d.confidence === "low" || d.confidence === "medium";
+    if (needsFalsifiability && !hasContent(section(d, "What Would Change Our Mind"))) {
+      return [
+        finding(
+          "missing-wwcm",
+          "WARNING",
+          "A low/medium-confidence decision must record what would change our mind (falsifiability, PRD §38).",
         ),
       ];
     }

@@ -1,0 +1,1 @@
+SiftOS hook adapter (OpenCode). Logical events map to lifecycle adapter points; the agent executes the configured hooks per references/hooks.md. Adapters are inert until hooks are enabled in .product/config.json.

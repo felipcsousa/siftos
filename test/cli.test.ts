@@ -164,6 +164,19 @@ describe("siftos CLI", () => {
     rmSync(broken, { recursive: true, force: true });
   });
 
+  it("validate fails on duplicate decision ids", () => {
+    const dup = mkdtempSync(path.join(os.tmpdir(), "siftos-dup-"));
+    mkdirSync(path.join(dup, ".git"));
+    runCli(["init"], dup);
+    const body = "---\nid: DEC-0001\ntitle: A\ncreated_at: 2026-01-01\nupdated_at: 2026-01-01\n---\n# Decision\n";
+    writeFileSync(path.join(dup, ".product", "decisions", "DEC-0001-a.md"), body);
+    writeFileSync(path.join(dup, ".product", "decisions", "DEC-0001-b.md"), body);
+    const r = runCli(["validate"], dup);
+    expect(r.code).toBe(1);
+    expect(`${r.stdout}\n${r.stderr}`).toContain("duplicate");
+    rmSync(dup, { recursive: true, force: true });
+  });
+
   it("audit renders Decision Health", () => {
     const r = runCli(["audit"], tmp);
     expect(r.code).toBe(0);

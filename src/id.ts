@@ -5,8 +5,11 @@ export const MAX_DECISION_ID = 9999;
 /**
  * Monotonic ID generation (PRD §26): find the highest existing ID,
  * increment, never reuse a removed ID, pad to 4 digits.
- * Collision is impossible by construction when callers pass the full
- * set of existing IDs; a lock is layered in ProductRepository.
+ *
+ * Concurrent allocation is serialized by an advisory lock in
+ * ProductRepository (src/repo.ts) and mirrored in the skill scripts
+ * (skill/scripts/lib.mjs); saveDecision additionally refuses to persist
+ * an ID that already exists, detecting conflicts before they land.
  */
 export function nextDecisionId(existing: string[]): string {
   let max = 0;

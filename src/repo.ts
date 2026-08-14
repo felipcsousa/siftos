@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { writeFileAtomic } from "./atomic.js";
 import { nextDecisionId } from "./id.js";
@@ -12,12 +22,32 @@ import {
   METRICS_TEMPLATE,
   PRINCIPLES_TEMPLATE,
   PRODUCT_TEMPLATE,
+  ROADMAP_TEMPLATE,
   STRATEGY_TEMPLATE,
 } from "./templates.js";
 
 export const PRODUCT_DIR = ".product";
 export const DECISIONS_DIR = "decisions";
 export const EVIDENCE_DIR = "evidence";
+
+/**
+ * Gitignore markers scoped to `.product/` itself: runtime and derived
+ * indexes are disposable (PRD V2 §83–§84, §98) and stay out of git.
+ * A nested .gitignore keeps the write boundary: SiftOS never edits the
+ * repository root.
+ */
+export const PRODUCT_GITIGNORE = `# siftos-ignore-start
+# Disposable runtime + derived indexes (regenerable).
+.runtime/
+.index/
+# siftos-ignore-end
+`;
+
+/** Advisory lock file for decision-ID allocation (PRD §26). */
+export const LOCK_FILE_NAME = ".siftos.lock";
+const LOCK_RETRY_MS = 25;
+const DEFAULT_LOCK_TIMEOUT_MS = 2000;
+const DEFAULT_LOCK_STALE_MS = 10_000;
 
 function walkUp(start: string): string[] {
   const dirs: string[] = [];
@@ -43,7 +73,10 @@ export function findRepoRoot(startDir: string): string | null {
 }
 
 export class ProductRepository {
-  constructor(public readonly root: string) {}
+  constructor(
+    public readonly root: string,
+    private readonly lockOpts: { timeoutMs?: number; staleMs?: number } = {},
+  ) {}
 
   get productDir(): string {
     return path.join(this.root, PRODUCT_DIR);
@@ -73,6 +106,22 @@ export class ProductRepository {
 
   configPath(): string {
     return path.join(this.productDir, "config.json");
+  }
+
+  /** Atomically persists repository config (PRD V2 §13, §108). */
+  saveConfig(config: SiftosConfig): string {
+    return path.relative(
+      this.root,
+      writeFileAtomic(this.productDir, "config.json", JSON.stringify(config, null, 2) + "\n"),
+    );
+  }
+
+  get runtimeDir(): string {
+    return path.join(this.productDir, ".runtime");
+  }
+
+  get indexDir(): string {
+    return path.join(this.productDir, ".index");
   }
 
   loadConfig(): SiftosConfig | null {
@@ -113,8 +162,60 @@ export class ProductRepository {
       .sort();
   }
 
+  private lockPath(): string {
+    return path.join(this.productDir, LOCK_FILE_NAME);
+  }
+
+  /**
+   * Advisory lock serializing decision-ID allocation (PRD §26). A stale
+   * lock (holder crashed) is stolen after `staleMs`; otherwise the caller
+   * waits up to `timeoutMs` and fails explicitly. Skipped when `.product/`
+   * does not exist yet (nothing to protect).
+   */
+  private withLock<T>(fn: () => T): T {
+    if (!this.initialized) return fn();
+    const timeoutMs = this.lockOpts.timeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
+    const staleMs = this.lockOpts.staleMs ?? DEFAULT_LOCK_STALE_MS;
+    const lock = this.lockPath();
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      try {
+        const fd = openSync(lock, "wx", 0o644);
+        try {
+          writeFileSync(fd, `${process.pid}\n`, "utf8");
+        } finally {
+          closeSync(fd);
+        }
+        break; // acquired
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+        let stale = false;
+        try {
+          stale = Date.now() - statSync(lock).mtimeMs > staleMs;
+        } catch {
+          // Lock vanished between EEXIST and stat: retry acquisition.
+        }
+        if (stale) {
+          rmSync(lock, { force: true });
+          continue;
+        }
+        if (Date.now() >= deadline) {
+          throw new Error(
+            `could not acquire decision id lock (${lock}): another SiftOS process may be running`,
+          );
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_RETRY_MS);
+      }
+    }
+    try {
+      return fn();
+    } finally {
+      rmSync(lock, { force: true });
+    }
+  }
+
   nextId(): string {
-    return nextDecisionId(this.decisionIds());
+    return this.withLock(() => nextDecisionId(this.decisionIds()));
   }
 
   readDecision(id: string): Decision {
@@ -141,12 +242,24 @@ export class ProductRepository {
    * Serializes and atomically persists a decision. Returns the created
    * file path (relative to the repository root).
    */
-  saveDecision(decision: Decision, { now }: { now: string }): string {
-    const updated: Decision = { ...decision, updatedAt: now };
-    const markdown = serializeDecision(updated);
-    const slug = slugify(decision.title);
-    const fileName = `${decision.id}-${slug}.md`;
-    return path.relative(this.root, writeFileAtomic(this.decisionsDir, fileName, markdown));
+  saveDecision(
+    decision: Decision,
+    { now, overwrite = false }: { now: string; overwrite?: boolean },
+  ): string {
+    return this.withLock(() => {
+      const existing = this.decisionFileNames().find((f) => f.startsWith(decision.id));
+      if (existing !== undefined && !overwrite) {
+        throw new Error(
+          `decision id conflict: ${decision.id} already exists — decision IDs are permanent and never reused (PRD §26); pass overwrite: true to update it in place`,
+        );
+      }
+      const updated: Decision = { ...decision, updatedAt: now };
+      const markdown = serializeDecision(updated);
+      // Updates keep the original filename (same id -> same slug file),
+      // so an update never creates a duplicate record.
+      const fileName = existing ?? `${decision.id}-${slugify(decision.title)}.md`;
+      return path.relative(this.root, writeFileAtomic(this.decisionsDir, fileName, markdown));
+    });
   }
 
   /**
@@ -178,6 +291,8 @@ export class ProductRepository {
     writeIfAbsent(this.productDir, "METRICS.md", METRICS_TEMPLATE);
     writeIfAbsent(this.productDir, "PRINCIPLES.md", PRINCIPLES_TEMPLATE);
     writeIfAbsent(this.productDir, "config.json", CONFIG_TEMPLATE);
+    writeIfAbsent(this.productDir, ".gitignore", PRODUCT_GITIGNORE);
+    writeIfAbsent(this.productDir, "ROADMAP.md", ROADMAP_TEMPLATE);
     writeIfAbsent(this.decisionsDir, "README.md", DECISIONS_README);
     writeIfAbsent(this.evidenceDir, "README.md", EVIDENCE_README);
 

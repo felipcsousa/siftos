@@ -53,6 +53,10 @@ export function cleanDecision(): Decision {
         "Improved activation could be offset by lower trial quality.",
       ],
       "Final Human Decision": ["Run a 50/50 experiment for new self-service accounts."],
+      "What Would Change Our Mind": [
+        "Abuse materially increases.",
+        "Trial-to-paid falls more than 5pp.",
+      ],
       "Revisit Condition": ["After 500 trials or 30 days."],
     },
   );

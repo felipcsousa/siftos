@@ -28,8 +28,8 @@ describe("linters: baseline behavior", () => {
     expect(lintDecision(ctx(cleanDecision()))).toEqual([]);
   });
 
-  it("registers all 15 rules", () => {
-    expect(LINTERS).toHaveLength(15);
+  it("registers all 18 rules", () => {
+    expect(LINTERS).toHaveLength(18);
   });
 });
 
@@ -118,6 +118,52 @@ describe("assumption-as-fact", () => {
 describe("no-dissent", () => {
   it("fires without strongest argument against", () => {
     expect(has(makeDecision(), "no-dissent")).toBe(true);
+  });
+});
+
+describe("missing-svt", () => {
+  it("fires on validating/ready bets without an SVT", () => {
+    expect(has(makeDecision({ status: "validating" }), "missing-svt", "WARNING")).toBe(true);
+    expect(has(makeDecision({ status: "ready" }), "missing-svt", "WARNING")).toBe(true);
+  });
+  it("silent with an SVT and for other statuses", () => {
+    const d = withSections(makeDecision({ status: "validating" }), {
+      SVT: ["Fake-door test with 200 visitors."],
+    });
+    expect(has(d, "missing-svt")).toBe(false);
+    expect(has(makeDecision({ status: "building" }), "missing-svt")).toBe(false);
+  });
+});
+
+describe("missing-scope", () => {
+  it("fires on building/measuring bets without scope (v0.2 shipped kept clean)", () => {
+    for (const status of ["building", "measuring"]) {
+      expect(has(makeDecision({ status }), "missing-scope", "WARNING")).toBe(true);
+    }
+    expect(has(makeDecision({ status: "shipped" }), "missing-scope")).toBe(false);
+  });
+  it("silent with scope defined", () => {
+    const d = withSections(makeDecision({ status: "building" }), {
+      Scope: ["Remove phone field.", "Remove company size."],
+    });
+    expect(has(d, "missing-scope")).toBe(false);
+  });
+});
+
+describe("missing-wwcm", () => {
+  it("fires on low/medium confidence without what-would-change-our-mind", () => {
+    expect(has(makeDecision({ confidence: "medium" }), "missing-wwcm", "WARNING")).toBe(true);
+    expect(has(makeDecision({ confidence: "low" }), "missing-wwcm", "WARNING")).toBe(true);
+  });
+  it("silent when the section is present", () => {
+    const d = withSections(makeDecision({ confidence: "medium" }), {
+      "What Would Change Our Mind": ["Abuse materially increases."],
+    });
+    expect(has(d, "missing-wwcm")).toBe(false);
+  });
+  it("silent for high confidence and absent confidence", () => {
+    expect(has(makeDecision({ confidence: "high" }), "missing-wwcm")).toBe(false);
+    expect(has(makeDecision(), "missing-wwcm")).toBe(false);
   });
 });
 

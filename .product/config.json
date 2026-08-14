@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "siftos",
+  "platforms": [
+    "opencode",
+    "codex"
+  ],
+  "linters": {
+    "enabled": true
+  }
+}

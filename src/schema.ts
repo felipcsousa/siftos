@@ -6,12 +6,19 @@ export const DEC_ID_RE = /^DEC-\d{4}$/;
 
 export const decisionStatusSchema = z.enum([
   "draft",
+  "shaping",
+  "validating",
+  "ready",
   "proposed",
   "accepted",
+  "building",
   "shipped",
+  "measuring",
   "reviewed",
   "rejected",
   "cancelled",
+  "paused",
+  "failed",
   "superseded",
 ]);
 

@@ -1,11 +1,18 @@
 export type DecisionStatus =
   | "draft"
+  | "shaping"
+  | "validating"
+  | "ready"
   | "proposed"
   | "accepted"
+  | "building"
   | "shipped"
+  | "measuring"
   | "reviewed"
   | "rejected"
   | "cancelled"
+  | "paused"
+  | "failed"
   | "superseded";
 
 export type Confidence = "low" | "medium" | "high";
@@ -43,6 +50,11 @@ export const DECISION_SECTIONS = [
   "Cost of Delay",
   "What Would Change Our Mind",
   "Revisit Condition",
+  "Target User",
+  "Hypothesis",
+  "Scope",
+  "Non-Goals",
+  "SVT",
 ] as const;
 
 export const OUTCOME_SECTIONS = [
@@ -98,6 +110,8 @@ export interface SiftosConfig {
   name: "siftos";
   platforms: Array<"opencode" | "codex">;
   linters: { enabled: boolean };
+  /** Raw `hooks` block (PRD V2 §13). Absent = not chosen = hooks off. */
+  hooks?: unknown;
 }
 
 export interface PlatformCapabilities {
