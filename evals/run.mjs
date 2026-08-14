@@ -208,7 +208,7 @@ for (const w of workflows) {
 }
 console.log("");
 console.log("decide / challenge / review require a live harness + model:");
-console.log('  OpenCode:  ask the agent: "/product decide <prompt>" (or challenge/review)');
+console.log('  OpenCode:  ask the agent: "/siftos decide <prompt>" (or challenge/review)');
 console.log("  Codex:     ask the agent to run the SiftOS decide/challenge/review workflow");
 console.log("");
 console.log(

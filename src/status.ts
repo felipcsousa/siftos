@@ -2,31 +2,43 @@ import type { DecisionStatus } from "./types.js";
 
 export const STATUS_ORDER: DecisionStatus[] = [
   "draft",
+  "shaping",
+  "validating",
+  "ready",
   "proposed",
   "accepted",
+  "building",
   "shipped",
+  "measuring",
   "reviewed",
   "rejected",
   "cancelled",
+  "paused",
+  "failed",
   "superseded",
 ];
 
 /**
- * Lifecycle (PRD §§23–24). Main flow:
- *   draft → proposed → accepted → shipped → reviewed
- * Alternates:
- *   proposed → rejected
- *   accepted → cancelled | superseded
- *   shipped → superseded
+ * Lifecycle (PRD §23–§24 + PRD V2 §87, unified). A "Bet" is a record in
+ * the pre-acceptance stretch of the same lifecycle — the graph
+ * Bet → Decision → Build → Outcome → Learning is status transitions, not
+ * artifact types. v0.2 transitions are preserved verbatim.
  */
 const TRANSITIONS: Record<DecisionStatus, DecisionStatus[]> = {
-  draft: ["proposed"],
-  proposed: ["accepted", "rejected"],
-  accepted: ["shipped", "cancelled", "superseded"],
-  shipped: ["reviewed", "superseded"],
+  draft: ["proposed", "shaping", "rejected"],
+  shaping: ["validating", "draft", "rejected"],
+  validating: ["ready", "shaping", "rejected"],
+  ready: ["accepted", "validating", "rejected"],
+  proposed: ["accepted", "validating", "rejected"],
+  accepted: ["shipped", "building", "cancelled", "superseded"],
+  building: ["shipped", "paused", "cancelled", "failed", "superseded"],
+  shipped: ["reviewed", "measuring", "superseded"],
+  measuring: ["reviewed", "paused", "failed"],
   reviewed: [],
   rejected: [],
   cancelled: [],
+  paused: ["building", "measuring", "cancelled", "failed"],
+  failed: [],
   superseded: [],
 };
 

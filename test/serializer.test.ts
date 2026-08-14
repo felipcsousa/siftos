@@ -3,17 +3,9 @@ import { serializeDecision } from "../src/serializer.js";
 import { parseDecision } from "../src/parser.js";
 import { makeDecision, withSections, cleanDecision } from "./helpers.js";
 
-const CANONICAL = [
-  "Context", "Goal", "Facts", "Evidence", "Inferences", "Assumptions",
-  "Unknowns", "Options Considered", "Alternatives Rejected",
-  "AI Recommendation", "Final Human Decision", "Rationale",
-  "Strongest Argument Against", "Expected Outcome", "Primary Metric",
-  "Guardrails", "Reversibility", "Cost of Delay",
-  "What Would Change Our Mind", "Revisit Condition",
-  "Observed Result", "Prediction Accuracy", "Unexpected Effects",
-  "Assumptions Confirmed", "Assumptions Invalidated", "Decision Assessment",
-  "Learnings", "Follow-up Decisions",
-];
+import { DECISION_SECTIONS, OUTCOME_SECTIONS } from "../src/types.js";
+
+const CANONICAL = [...DECISION_SECTIONS, ...OUTCOME_SECTIONS];
 
 describe("serializeDecision", () => {
   it("emits frontmatter in canonical order and omits empties", () => {

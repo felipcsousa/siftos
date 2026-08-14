@@ -46,15 +46,34 @@ All four must pass before a PR is reviewable.
 | `src/types.ts` | PDR types, canonical sections, lint contract |
 | `src/schema.ts` | zod schema + one-shot repair (PRD §68) |
 | `src/parser.ts` / `src/serializer.ts` | Markdown round-trip |
-| `src/linters.ts` | the 15 deterministic rules |
+| `src/linters.ts` | the 18 deterministic rules |
 | `src/audit.ts` | Decision Health report |
+| `src/config.ts` | hook schema, presets, config resolution (PRD V2 §20) |
+| `src/runtime.ts` | disposable session state (`.product/.runtime/`) |
+| `src/hooks.ts` | hook envelope, scope drift, context capsule |
+| `src/guard.ts` | Product Guard: tool effect, levels, deterministic gate |
+| `src/shipgate.ts` | deterministic Ship Gate (shared manual/automatic) |
 | `src/cli.ts` | `siftos` CLI |
 | `skill/SKILL.md` | the canonical agent skill entry point |
-| `skill/references/` | protocols (decide, challenge, review, evidence, schema, linters) |
+| `skill/references/` | protocols (decide, challenge, review, shape, validate, ship, hooks, ...) |
 | `skill/scripts/` | dependency-free `.mjs` mirror of the deterministic core |
 | `skill/assets/` | init templates |
 | `test/` | vitest suite |
 | `evals/` | fixtures + `run.mjs` (manifest with expectations) |
+| `evals/hooks/` | deterministic hook eval suite (`run.mjs`) |
+
+## How to add a hook or guard rule
+
+1. **`src/guard.ts`** — add keyword patterns to the deterministic level
+   classifier (L0–L3) and keep `guardVerdict` pure (level × enforcement →
+   verdict). The gate must never depend on the model.
+2. **`src/hooks.ts`** — the envelope (`runHook`) applies failure policy;
+   `detectScopeDrift` and `buildCapsule` are deterministic helpers.
+3. **`skill/scripts/hook-codex.mjs`** — mirror the classifier for
+   script-executed hooks (no LLM available).
+4. **`skill/references/hooks.md`** — document the hook behavior for
+   agent-executed hooks.
+5. **`evals/hooks/run.mjs`** — add a deterministic case.
 
 ## How to add a linter
 

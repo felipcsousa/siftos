@@ -37,7 +37,7 @@ export function matchesFilters(d: Decision, f: SearchFilters): boolean {
   if (f.goal && d.goal !== f.goal) return false;
   if (f.pendingReview) {
     const now = f.now ?? today();
-    const open = ["accepted", "shipped"].includes(d.status);
+    const open = ["accepted", "building", "shipped", "measuring"].includes(d.status);
     if (!open) return false;
     if (!d.reviewDate || d.reviewDate >= now) return false;
   }

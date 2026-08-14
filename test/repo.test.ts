@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, openSync, closeSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ProductRepository, findRepoRoot } from "../src/repo.js";
@@ -59,6 +59,71 @@ describe("ProductRepository", () => {
     expect(repo.nextId()).toBe("DEC-0001");
     repo.saveDecision(makeDecision({ id: "DEC-0001", title: "First" }), { now: NOW });
     expect(repo.nextId()).toBe("DEC-0002");
+  });
+
+  it("nextId serializes allocation through the advisory lock", () => {
+    const fresh = path.join(tmp, "lock-serial");
+    mkdirSync(fresh, { recursive: true });
+    mkdirSync(path.join(fresh, ".git"));
+    const repo = new ProductRepository(fresh);
+    repo.init(NOW);
+    expect(repo.nextId()).toBe("DEC-0001");
+    repo.saveDecision(makeDecision({ id: "DEC-0001", title: "First" }), { now: NOW });
+    expect(repo.nextId()).toBe("DEC-0002");
+  });
+
+  it("nextId fails explicitly while another process holds the lock", () => {
+    const repo = new ProductRepository(tmp, { timeoutMs: 50 });
+    const lock = path.join(tmp, ".product", ".siftos.lock");
+    const fd = openSync(lock, "wx");
+    writeFileSync(fd, "99999\n");
+    closeSync(fd);
+    try {
+      expect(() => repo.nextId()).toThrow(/lock/);
+    } finally {
+      rmSync(lock, { force: true });
+    }
+  });
+
+  it("nextId steals a stale lock left by a crashed holder", () => {
+    const repo = new ProductRepository(tmp, { staleMs: 0 });
+    writeFileSync(path.join(tmp, ".product", ".siftos.lock"), "99999\n");
+    try {
+      expect(typeof repo.nextId()).toBe("string");
+    } finally {
+      rmSync(path.join(tmp, ".product", ".siftos.lock"), { force: true });
+    }
+  });
+
+  it("saveDecision refuses a reused id unless overwrite is explicit", () => {
+    const fresh = path.join(tmp, "lock-conflict");
+    mkdirSync(fresh, { recursive: true });
+    mkdirSync(path.join(fresh, ".git"));
+    const repo = new ProductRepository(fresh);
+    repo.init(NOW);
+    const d = makeDecision({ id: "DEC-0100", title: "Conflict test" });
+    repo.saveDecision(d, { now: NOW });
+    expect(() =>
+      repo.saveDecision(makeDecision({ id: "DEC-0100", title: "Again" }), { now: NOW }),
+    ).toThrow(/DEC-0100/);
+  });
+
+  it("saveDecision overwrite updates in place without duplicating the id", () => {
+    const fresh = path.join(tmp, "lock-update");
+    mkdirSync(fresh, { recursive: true });
+    mkdirSync(path.join(fresh, ".git"));
+    const repo = new ProductRepository(fresh);
+    repo.init(NOW);
+    repo.saveDecision(makeDecision({ id: "DEC-0101", title: "Original title" }), { now: NOW });
+    const rel = repo.saveDecision(
+      makeDecision({ id: "DEC-0101", title: "Updated title", status: "shipped" }),
+      { now: NOW, overwrite: true },
+    );
+    // Same file (same id), updated content, exactly one DEC-0101 file.
+    expect(rel).toMatch(/^\.product\/decisions\/DEC-0101-original-title\.md$/);
+    expect(repo.decisionFileNames().filter((f) => f.startsWith("DEC-0101"))).toHaveLength(1);
+    expect(repo.readDecision("DEC-0101").title).toBe("Updated title");
+    expect(repo.readDecision("DEC-0101").status).toBe("shipped");
   });
 
   it("saveDecision writes an atomically persisted, parseable file", () => {

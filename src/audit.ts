@@ -11,12 +11,19 @@ export function auditDecisions(
 ): AuditSummary {
   const byStatus: AuditSummary["byStatus"] = {
     draft: 0,
+    shaping: 0,
+    validating: 0,
+    ready: 0,
     proposed: 0,
     accepted: 0,
+    building: 0,
     shipped: 0,
+    measuring: 0,
     reviewed: 0,
     rejected: 0,
     cancelled: 0,
+    paused: 0,
+    failed: 0,
     superseded: 0,
   };
   for (const d of decisions) {
@@ -24,11 +31,11 @@ export function auditDecisions(
   }
 
   const accepted = decisions.filter((d) =>
-    ["accepted", "shipped", "reviewed", "superseded"].includes(d.status),
+    ["accepted", "building", "shipped", "measuring", "reviewed", "superseded"].includes(d.status),
   );
   const waitingForReview = decisions.filter(
     (d) =>
-      ["accepted", "shipped"].includes(d.status) &&
+      ["accepted", "building", "shipped", "measuring"].includes(d.status) &&
       d.reviewDate !== undefined &&
       d.reviewDate !== null &&
       d.reviewDate < opts.now,
@@ -58,12 +65,19 @@ export function auditDecisions(
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "draft",
+  shaping: "shaping",
+  validating: "validating",
+  ready: "ready",
   proposed: "proposed",
   accepted: "accepted",
+  building: "building",
   shipped: "shipped",
+  measuring: "measuring",
   reviewed: "reviewed",
   rejected: "rejected",
   cancelled: "cancelled",
+  paused: "paused",
+  failed: "failed",
   superseded: "superseded",
 };
 

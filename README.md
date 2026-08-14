@@ -44,7 +44,7 @@ Learning
   versioned, human-readable, agent-readable, searchable Markdown file.
 - **Six workflows** — `init`, `decide`, `challenge`, `review`, `show`,
   `audit`.
-- **Fifteen deterministic linters** — the "Product Slop Detector" —
+- **Eighteen deterministic linters** — the "Product Slop Detector" —
   that never depend on the model.
 - **Local-first, Git-native** — persistence is Markdown, history is Git,
   source of truth is `.product/`. No database, no vendor lock-in.
@@ -117,14 +117,20 @@ Argument Against`, `Expected Outcome`, `Primary Metric`, `Guardrails`,
 Condition` — plus an `# Outcome` part (`Observed Result`, `Prediction
 Accuracy`, `Decision Assessment`, `Learnings`, ...).
 
-Status lifecycle:
+Status lifecycle (unified, V2): a bet and a decision are the same
+artifact in different lifecycle stretches:
 
 ```text
-draft → proposed → accepted → shipped → reviewed
-proposed → rejected
-accepted → cancelled | superseded
-shipped → superseded
+draft → shaping → validating → ready → accepted → building → shipped → measuring → reviewed
+proposed → accepted | rejected | validating
+accepted → shipped | building | cancelled | superseded
+building → shipped | paused | failed | cancelled | superseded
+shipped → reviewed | measuring | superseded
+paused → building | measuring | cancelled | failed
 ```
+
+v0.2 statuses (`proposed`, `shipped`, `reviewed`, `rejected`, `cancelled`,
+`superseded`) remain valid; existing PDRs migrate without conversion.
 
 A PDR reaches `accepted` only after an explicit human decision. Original
 predictions are preserved verbatim through review — hindsight rewriting
@@ -141,6 +147,37 @@ is a bug.
 | `show`      | Retrieve decisions by ID, text, tags, status, owner, goal, pending review. |
 | `audit`     | Decision Health: counts, waiting reviews, deterministic linter findings. |
 
+### Automatic hooks (V2)
+
+SiftOS can observe and, only when configured, gate the coding lifecycle.
+Every hook is independently **Installed / Enabled / Observed** — installing
+adapters never enables them (upgrade from v0.2 keeps hooks off until you
+choose). Presets:
+
+| Preset | Behavior |
+| --- | --- |
+| `off` | Manual SiftOS only; every explicit workflow keeps working. |
+| `advisory` | Observes and advises; never blocks. |
+| `balanced` | Default for new repositories; Product Guard blocks L2/L3 once until resolved. |
+| `strict` | Hard gates L2/L3 and unknown mutations; Ship Gate required. |
+| `custom` | Any per-hook combination (manual edits materialize the config). |
+
+Config precedence: session override → `.product/config.json` →
+`~/.siftos/config.json` → preset → defaults. Config lives in
+`.product/config.json` and is committed-able; runtime state lives in
+`.product/.runtime/` and is gitignored.
+
+Product Guard classifies work L0 (technical) / L1 (minor) / L2 (material)
+/ L3 (strategic). The gate is deterministic (level × enforcement); the
+model classifies on agent-executed hooks, a keyword fallback on
+script-executed hooks (Codex adapter). `Build anyway` is always available
+— the human owns the decision.
+
+Ship Gate (`siftos ship`) verifies measurement readiness for accepted+
+bets: target user, problem, expected outcome, metric, baseline, success
+threshold, instrumentation, guardrails, review condition, scope. It is
+product lifecycle state, not deployment authorization.
+
 ### Linters
 
 | Rule | Check | Severity |
@@ -152,6 +189,9 @@ is a bug.
 | `metric-without-baseline` | relative prediction without a real baseline | WARNING |
 | `assumption-as-fact` | same statement in Facts and Assumptions | ERROR |
 | `no-dissent` | no strongest argument against | WARNING |
+| `missing-wwcm` | low/medium confidence without `What Would Change Our Mind` | WARNING |
+| `missing-svt` | validating/ready bet without a Smallest Valuable Test | WARNING |
+| `missing-scope` | building/measuring bet without a defined scope | WARNING |
 | `no-human-decision` | accepted+ without explicit human decision | ERROR |
 | `orphan-decision` | accepted+ without goal/strategy link | ERROR |
 | `stale-review` | review date passed, decision not reviewed | WARNING |
@@ -183,6 +223,12 @@ siftos search <query>     # --status= --tag= --owner= --goal= --pending-review
 siftos next-id            # next monotonic DEC-XXXX
 siftos show <DEC-XXXX>    # show one decision
 siftos context [<query>]  # compiled context package for agent workflows
+siftos hooks              # show/change the automatic hook policy (--session for overrides)
+siftos hook enable|disable <hook>   # per-hook toggles (converts preset to custom)
+siftos ship <DEC-XXXX>    # deterministic Ship Gate (PASS/FAIL/NOT REQUIRED)
+siftos roadmap            # render the roadmap from active bets (--write persists)
+siftos guard check <p>    # Product Guard: classify + gate a mutation (--level=, --resolution=)
+siftos scope <DEC> <p>    # scope drift: implementation footprint vs bet scope
 siftos doctor             # installation and repository health
 siftos version
 ```
@@ -215,7 +261,7 @@ test/       unit and integration tests (vitest)
 ```bash
 npm install
 npm run typecheck   # tsc --noEmit
-npm test            # vitest: 112 tests
+npm test            # vitest: 188 tests
 npm run build       # tsc + copy skill into dist/
 node evals/run.mjs  # cross-platform eval suite (deterministic workflows)
 ```
