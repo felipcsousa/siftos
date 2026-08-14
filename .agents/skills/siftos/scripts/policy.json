@@ -1,0 +1,44 @@
+{
+  "build_authorizing_statuses": ["accepted", "building", "shipped", "measuring"],
+  "ship_gate_statuses": ["accepted", "building", "shipped", "measuring"],
+  "guard": {
+    "l3": [
+      "\\bpricing\\b",
+      "\\bbilling\\b",
+      "\\bsubscriptions?\\b",
+      "\\bpaywall\\b",
+      "\\bpayments?\\b",
+      "\\bstripe\\b",
+      "\\baccount model\\b",
+      "\\bmarketplace\\b",
+      "\\bbusiness model\\b",
+      "\\b(?:pricing|billing|subscription) plans?\\b"
+    ],
+    "l2": [
+      "\\breferrals?\\b",
+      "\\buser invitations?\\b",
+      "\\binvite users?\\b",
+      "\\bdata export\\b",
+      "\\bnotifications?\\b",
+      "\\boauth\\b",
+      "\\b(?:log[ -]?in|sign[ -]?in)\\b",
+      "\\bintegrations?\\b",
+      "\\bonboard(?:ing)?\\b",
+      "\\bpermissions?\\b",
+      "\\bworkspaces?\\b"
+    ],
+    "l1": [
+      "\\bcopy\\b",
+      "\\bcta\\b",
+      "\\blabel\\b",
+      "\\btooltip\\b",
+      "\\.css\\b",
+      "\\bspacing\\b",
+      "\\bbutton text\\b"
+    ],
+    "non_product_paths": [
+      "(?:^|/)(?:test|tests|__tests__|docs?|examples?|fixtures?)(?:/|$)",
+      "\\.(?:md|txt|snap)$"
+    ]
+  }
+}
