@@ -1,177 +1,148 @@
 #!/usr/bin/env node
-// SiftOS Codex hook adapter (PRD V2 §29, draft). Maps logical hooks to
-// Codex hook events; reads the tool event from stdin (JSON per the Codex
-// hook contract), runs the deterministic classifier, and applies the
-// deterministic gate. No LLM here — script hooks use the deterministic
-// fallback (PRD V2 §106 NFR-003, D3 decision).
-//
-// Blocking surface: PreToolUse events print a BLOCK-style decision when
-// the gate requires resolution. Fail-open is the default; strict
-// before_mutation is fail-closed. Never fails silently (PRD V2 §104).
-import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, renameSync } from "node:fs";
-import path from "node:path";
-import { findProductRoot } from "./lib.mjs";
+// Codex lifecycle adapter. Emits the documented JSON contracts for
+// additional context, PreToolUse permission decisions, and Stop continuation.
+import { readFileSync } from "node:fs";
+import {
+  beforeMutation,
+  buildCapsule,
+  clearSession,
+  closeout,
+  effectiveHook,
+  loadRuntime,
+  observe,
+  productRoot,
+  recordMutation,
+  startTurn,
+} from "./hook-lib.mjs";
 
-const HOOK_ARG = process.argv[2] ?? "";
-const LOGICAL = {
-  session_start: "session_start",
-  prompt_submit: "prompt_submit",
-  before_mutation: "before_mutation",
-  after_mutation: "after_mutation",
-  turn_stop: "turn_stop",
-};
+const eventName = process.argv[2] ?? "";
 
-const L3 = /pricing|billing|subscription|\bplans?\b|paywall|\bicp\b|account model|marketplace|payment|stripe/i;
-const L2 = /referral|invite|export|notification|oauth|login|integration|onboard|permission/i;
-const L1 = /\bcopy\b|\bcta\b|label|tooltip|\.css|spacing|button text/i;
-
-function classify(files) {
-  const joined = files.join(" ").toLowerCase();
-  if (L3.test(joined)) return "L3";
-  if (L2.test(joined)) return "L2";
-  if (L1.test(joined)) return "L1";
-  return files.length === 0 ? "UNKNOWN" : "L0";
+function input() {
+  try { return JSON.parse(readFileSync(0, "utf8") || "{}"); }
+  catch { return {}; }
 }
 
-function verdict(level, enforcement) {
-  if (enforcement === "off" || enforcement === "advisory") return "ALLOW";
-  if (enforcement === "strict") {
-    if (level === "L0") return "ALLOW";
-    if (level === "L1") return "ADVISE";
-    return "REQUIRE_RESOLUTION";
-  }
-  // balanced
-  if (level === "L2" || level === "L3") return "BLOCK_ONCE";
-  return "ALLOW";
+function output(value) {
+  process.stdout.write(JSON.stringify(value) + "\n");
 }
 
-function loadConfig(root) {
-  try {
-    return JSON.parse(readFileSync(path.join(root, ".product", "config.json"), "utf8"));
-  } catch {
-    return {};
-  }
+const root = productRoot();
+if (!root) {
+  // Hooks must not make unrelated repositories unusable.
+  output({});
+  process.exit(0);
 }
 
-function runtime(root) {
-  const file = path.join(root, ".product", ".runtime", "session.json");
-  if (!existsSync(file)) return { hook_overrides: {}, guard: { block_issued: false } };
-  try {
-    return JSON.parse(readFileSync(file, "utf8"));
-  } catch {
-    return { hook_overrides: {}, guard: { block_issued: false } };
-  }
+const event = input();
+const state = loadRuntime(root);
+const config = effectiveHook(root, eventName, state);
+if (!config?.enabled) {
+  output({});
+  process.exit(0);
 }
 
-function saveRuntime(root, state) {
-  const dir = path.join(root, ".product", ".runtime");
-  mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, "session.json");
-  const tmp = path.join(dir, `.session.json.tmp-${process.pid}`);
-  writeFileSync(tmp, JSON.stringify(state, null, 2) + "\n");
-  try {
-    renameSync(tmp, file);
-  } catch (err) {
-    rmSync(tmp, { force: true });
-    throw err;
-  }
-}
-
-function main() {
-  const root = findProductRoot(process.cwd());
-  if (!root) {
-    console.error("error: no .product/ found in this directory tree");
-    process.exit(1);
-  }
-  const config = loadConfig(root);
-  const rawHooks = config.hooks ?? null;
-  if (!rawHooks || rawHooks.preset === "off") {
-    console.log("SiftOS hook: disabled");
-    process.exit(0);
-  }
-  const hookName = LOGICAL[HOOK_ARG];
-  if (!hookName) {
-    console.error(`error: unknown hook event "${HOOK_ARG}"`);
-    process.exit(1);
-  }
-  const state = runtime(root);
-
-  // Effective enabled flag (preset + per-hook + session override).
-  const presets = {
-    advisory: { before_mutation: "advisory", turn_stop: "advisory" },
-    balanced: { before_mutation: "balanced", turn_stop: "advisory" },
-    strict: { before_mutation: "strict", turn_stop: "strict" },
-  };
-  const spec = presets[rawHooks.preset] ?? {};
-  const raw = rawHooks[hookName] ?? {};
-  const sessionOv = state.hook_overrides?.[hookName] ?? {};
-  const enabled = sessionOv.enabled ?? raw.enabled ?? (rawHooks.preset === "custom" ? false : rawHooks.preset !== "off");
-  if (!enabled) {
-    console.log(`SiftOS hook ${hookName}: disabled`);
-    process.exit(0);
-  }
-  const enforcement = sessionOv.enforcement ?? raw.enforcement ?? spec[hookName] ?? "advisory";
-  const failurePolicy = raw.failure_policy ?? (rawHooks.preset === "strict" && hookName === "before_mutation" ? "fail_closed" : "fail_open");
-
-  if (hookName !== "before_mutation" && hookName !== "after_mutation") {
-    state.heartbeat = state.heartbeat ?? {};
-    state.heartbeat[hookName] = new Date().toISOString();
-    saveRuntime(root, state);
-    console.log(`SiftOS hook ${hookName}: observed`);
-    process.exit(0);
-  }
-
-  // Read the tool event from stdin (Codex hook contract: tool_name,
-  // tool_input) or fall back to argv paths.
-  let event = {};
-  try {
-    event = JSON.parse(readFileSync(0, "utf8") || "{}");
-  } catch {
-    event = {};
-  }
-  const input = event.tool_input ?? {};
-  const files = Object.values(input).flatMap((v) =>
-    typeof v === "string" ? [v] : Array.isArray(v) ? v : [],
-  );
-
-  if (hookName === "after_mutation") {
-    state.mutation = state.mutation ?? { files: [] };
-    state.mutation.files = files;
-    state.heartbeat = state.heartbeat ?? {};
-    state.heartbeat[hookName] = new Date().toISOString();
-    saveRuntime(root, state);
-    console.log(`SiftOS hook after_mutation: footprint ${files.length} file(s)`);
-    process.exit(0);
-  }
-
-  // before_mutation
-  try {
-    const level = classify(files);
-    let v = verdict(level, enforcement);
-    if (v === "BLOCK_ONCE" && state.guard?.block_issued) v = "ALLOW";
-    if (v === "BLOCK_ONCE") {
-      state.guard = state.guard ?? {};
-      state.guard.block_issued = true;
+try {
+  switch (eventName) {
+    case "session_start": {
+      observe(root, state, "session_start");
+      output({
+        hookSpecificOutput: {
+          hookEventName: "SessionStart",
+          additionalContext: buildCapsule(root, loadRuntime(root)),
+        },
+      });
+      break;
     }
-    state.guard = state.guard ?? {};
-    state.guard.level = level;
-    state.heartbeat = state.heartbeat ?? {};
-    state.heartbeat[hookName] = new Date().toISOString();
-    saveRuntime(root, state);
-    console.log(`SiftOS Guard: level ${level}, verdict ${v}`);
-    if (v === "BLOCK_ONCE" || v === "REQUIRE_RESOLUTION") {
-      console.log("Resolve: shape / validate / prototype / existing_bet / reconsider / build_anyway");
-      process.exit(2);
+
+    case "prompt_submit": {
+      const next = startTurn(root, {
+        turnId: event.turn_id ?? event.turnId ?? `turn-${Date.now()}`,
+        prompt: event.prompt ?? "",
+      });
+      const advisory = next.candidate === "technical"
+        ? ""
+        : "This turn may contain a product decision. Before the first product-changing mutation, resolve SiftOS Product Guard; do not treat a retry as authorization.";
+      output({
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit",
+          additionalContext: advisory,
+        },
+      });
+      break;
     }
-    process.exit(0);
-  } catch (err) {
-    if (failurePolicy === "fail_closed") {
-      console.error(`SiftOS Guard error (fail_closed): ${err.message}`);
-      process.exit(2);
+
+    case "before_mutation": {
+      const result = beforeMutation(root, {
+        toolName: event.tool_name ?? event.toolName ?? "",
+        toolInput: event.tool_input ?? event.toolInput ?? {},
+      });
+      if (!result.allowed) {
+        output({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "deny",
+            permissionDecisionReason: result.message,
+          },
+        });
+      } else if (result.message) {
+        output({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            additionalContext: result.message,
+          },
+        });
+      } else {
+        output({});
+      }
+      break;
     }
-    console.log(`SiftOS Guard error (fail_open): ${err.message}`);
-    process.exit(0);
+
+    case "after_mutation": {
+      recordMutation(root, { toolInput: event.tool_input ?? event.toolInput ?? {} });
+      output({});
+      break;
+    }
+
+    case "turn_stop": {
+      // Codex marks re-entry with stop_hook_active. Never create a Stop loop.
+      if (event.stop_hook_active === true) {
+        output({});
+        break;
+      }
+      const result = closeout(root);
+      if (result.continue) output({ decision: "block", reason: result.message });
+      else if (result.message) output({ systemMessage: result.message });
+      else output({});
+      break;
+    }
+
+    case "context_compact": {
+      observe(root, state, "context_compact");
+      output({});
+      break;
+    }
+
+    case "session_end": {
+      clearSession(root);
+      output({});
+      break;
+    }
+
+    default:
+      output({});
+  }
+} catch (err) {
+  const failurePolicy = config.failure_policy ?? "fail_open";
+  if (eventName === "before_mutation" && failurePolicy === "fail_closed") {
+    output({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `SiftOS Product Guard error (fail_closed): ${err.message}`,
+      },
+    });
+  } else {
+    // A hook failure must be visible but must not corrupt the harness protocol.
+    output({ systemMessage: `SiftOS ${eventName} hook error (fail_open): ${err.message}` });
   }
 }
-
-main();
