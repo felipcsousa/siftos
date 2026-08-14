@@ -89,7 +89,7 @@ describe("hardened SiftOS entrypoint", () => {
 
     const shape = runEntry(["guard", "check", "--level=L2", "--resolution=shape", "app/referrals.ts"], dir);
     expect(shape.code).toBe(1);
-    expect(shape.stdout).toContain("production mutation remains gated");
+    expect(shape.stdout).toContain("still unresolved");
 
     const bypass = runEntry(["guard", "check", "--level=L2", "--resolution=build_anyway", "app/referrals.ts"], dir);
     expect(bypass.code).toBe(0);
