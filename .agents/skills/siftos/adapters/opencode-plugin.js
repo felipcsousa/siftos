@@ -39,6 +39,8 @@ export const SiftOSPlugin = async ({ client, directory }) => {
     "tool.execute.before": async (input, output) => {
       const state = loadRuntime(root);
       if (!state.turn_id) {
+        // No documented 1:1 UserPromptSubmit in this adapter API. Scope the
+        // unresolved intent to this concrete OpenCode session, never process id.
         state.turn_id = `opencode-${state.session_id}`;
         state.guard.intent_id = state.turn_id;
         if (state.guard.status === "idle") state.guard.status = "unresolved";

@@ -1,6 +1,16 @@
 {
-  "build_authorizing_statuses": ["accepted", "building", "shipped", "measuring"],
-  "ship_gate_statuses": ["accepted", "building", "shipped", "measuring"],
+  "build_authorizing_statuses": [
+    "accepted",
+    "building",
+    "shipped",
+    "measuring"
+  ],
+  "ship_gate_statuses": [
+    "accepted",
+    "building",
+    "shipped",
+    "measuring"
+  ],
   "guard": {
     "l3": [
       "\\bpricing\\b",
@@ -39,6 +49,17 @@
     "non_product_paths": [
       "(?:^|/)(?:test|tests|__tests__|docs?|examples?|fixtures?)(?:/|$)",
       "\\.(?:md|txt|snap)$"
-    ]
+    ],
+    "candidate": {
+      "obvious_product": [
+        "\\b(add|introduce|launch|remove|change|redesign|enable|disable|monetiz|pricing|subscription|referral|onboard|oauth|notification|marketplace|paywall)\\b"
+      ],
+      "technical": [
+        "\\b(fix|refactor|rename variable|failing test|lint|format|dependency upgrade|type error)\\b"
+      ],
+      "possible_product": [
+        "\\b(user|customer|flow|screen|cta|copy|behavior|experience|feature)\\b"
+      ]
+    }
   }
 }

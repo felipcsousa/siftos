@@ -135,7 +135,29 @@ withRepo((dir) => {
   recordMutation(dir, { toolName: "Write", toolInput: { file_path: "src/a.ts" } });
   assertEq(loadRuntime(dir).mutation.started, true, "after mutation: writes are recorded");
   const result = closeout(dir);
-  assert(result.message.includes("no unique active building Bet"), "OpenCode-style idle closeout reports unattached mutations");
+  assert(result.message.includes("no unique active Bet"), "OpenCode-style idle closeout reports unattached mutations");
+});
+
+withRepo((dir) => {
+  run(["hooks", "set", "advisory"], dir);
+  recordMutation(dir, { toolName: "Bash", toolInput: { command: "rm src/foo.ts && echo done" } });
+  const files = loadRuntime(dir).mutation.files;
+  assert(files.includes("src/foo.ts"), "footprint: shell mutation records path tokens");
+  assert(!files.some((file) => /(?:&&|echo|done)/.test(file)), "footprint: whole shell command is not recorded");
+});
+
+withRepo((dir) => {
+  run(["hooks", "set", "balanced"], dir);
+  const prompt = "Add a feature to show monthly usage";
+  const cli = run(["guard", "check", `--prompt=${prompt}`, "src/usage.ts"], dir);
+  assertEq(cli.code, 1, "parity: CLI blocks product-flavored prompt like the hook");
+  assert(cli.stdout.includes("Level: L2"), "parity: CLI classifies product-flavored prompt as L2");
+  run(["install"], dir);
+  const hook = path.join(dir, ".agents", "skills", "siftos", "scripts", "hook-codex.mjs");
+  const env = { ...process.env, HOME: dir };
+  execFileSync(process.execPath, [hook, "prompt_submit"], { cwd: dir, env, encoding: "utf8", input: JSON.stringify({ turn_id: "t-parity", prompt }) });
+  const pre = JSON.parse(execFileSync(process.execPath, [hook, "before_mutation"], { cwd: dir, env, encoding: "utf8", input: JSON.stringify({ turn_id: "t-parity", tool_name: "Write", tool_input: { file_path: "src/usage.ts" } }) }));
+  assertEq(pre.hookSpecificOutput?.permissionDecision, "deny", "parity: hook denies the same product-flavored mutation");
 });
 
 withRepo((dir) => {

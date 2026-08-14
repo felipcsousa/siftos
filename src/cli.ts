@@ -130,9 +130,33 @@ function effectiveConfig(repo: ProductRepository) {
   };
 }
 
+const SIFTOS_CODEX_EVENTS = new Set([
+  "session_start", "prompt_submit", "before_mutation", "after_mutation",
+  "context_compact", "turn_stop", "session_end",
+]);
+
+/**
+ * True when the entry (or entry array) contains a SiftOS Codex command.
+ * Matches the exact command shape `hook-codex.mjs <event>` rather than a raw
+ * substring, so a user hook that merely mentions the path is not mistaken for
+ * a SiftOS adapter and a SiftOS entry is not duplicated on reinstall.
+ */
 function isSiftosCodexEntry(value: unknown): boolean {
-  try { return JSON.stringify(value).includes(".agents/skills/siftos/scripts/hook-codex.mjs"); }
-  catch { return false; }
+  try {
+    const entries = Array.isArray(value) ? value : [value];
+    return entries.some((entry) => {
+      const hooks = (entry as { hooks?: Array<{ command?: unknown }> })?.hooks;
+      if (!Array.isArray(hooks)) return false;
+      return hooks.some((hook) => {
+        const command = (hook as { command?: unknown })?.command;
+        if (typeof command !== "string") return false;
+        const match = command.match(/hook-codex\.mjs\s+([a-z_]+)\s*$/);
+        if (match === null) return false;
+        const event = match[1];
+        return event !== undefined && SIFTOS_CODEX_EVENTS.has(event);
+      });
+    });
+  } catch { return false; }
 }
 function mergeCodexHooks(existing: Record<string, unknown>, siftos: Record<string, unknown>): Record<string, unknown> {
   const existingHooks = existing["hooks"] && typeof existing["hooks"] === "object" ? existing["hooks"] as Record<string, unknown> : {};
@@ -488,7 +512,7 @@ async function cmdGuard(args: Args): Promise<number> {
   const levelFlag = typeof args.flags["level"] === "string" ? args.flags["level"].toUpperCase() : null;
   const level: GuardLevel = levelFlag && ["L0", "L1", "L2", "L3", "UNKNOWN"].includes(levelFlag)
     ? levelFlag as GuardLevel
-    : classifyLevelDeterministic(prompt ? [prompt, ...files] : files);
+    : classifyLevelDeterministic(files, prompt || undefined);
 
   let state = loadRuntime(repo.root);
   const explicitTurn = typeof args.flags["turn-id"] === "string" ? args.flags["turn-id"] : null;

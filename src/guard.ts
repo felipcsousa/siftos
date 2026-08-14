@@ -27,6 +27,8 @@ export const GUARD_RESOLUTIONS: GuardResolution[] = [
   "build_anyway",
 ];
 
+export type GuardCandidate = "technical" | "possible_product" | "obvious_product" | "unknown";
+
 interface SharedPolicy {
   build_authorizing_statuses: string[];
   ship_gate_statuses: string[];
@@ -35,6 +37,11 @@ interface SharedPolicy {
     l2: string[];
     l1: string[];
     non_product_paths: string[];
+    candidate: {
+      obvious_product: string[];
+      technical: string[];
+      possible_product: string[];
+    };
   };
 }
 
@@ -49,6 +56,26 @@ const L3_PATTERNS = POLICY.guard.l3.map((value) => new RegExp(value, "i"));
 const L2_PATTERNS = POLICY.guard.l2.map((value) => new RegExp(value, "i"));
 const L1_PATTERNS = POLICY.guard.l1.map((value) => new RegExp(value, "i"));
 const NON_PRODUCT_PATHS = POLICY.guard.non_product_paths.map((value) => new RegExp(value, "i"));
+const CANDIDATE_PATTERNS = {
+  obvious_product: POLICY.guard.candidate.obvious_product.map((value) => new RegExp(value, "i")),
+  technical: POLICY.guard.candidate.technical.map((value) => new RegExp(value, "i")),
+  possible_product: POLICY.guard.candidate.possible_product.map((value) => new RegExp(value, "i")),
+};
+
+/**
+ * Prompt-intent triage shared with the hook runtime. The candidate decides
+ * whether a prompt with no explicit policy keyword is still product-flavored
+ * (possible/obvious product => L2) so the CLI guard and the automatic hooks
+ * gate the same intents.
+ */
+export function classifyCandidate(input: string): GuardCandidate {
+  const text = String(input ?? "").toLowerCase().trim();
+  if (!text) return "unknown";
+  if (CANDIDATE_PATTERNS.obvious_product.some((pattern) => pattern.test(text))) return "obvious_product";
+  if (CANDIDATE_PATTERNS.technical.some((pattern) => pattern.test(text))) return "technical";
+  if (CANDIDATE_PATTERNS.possible_product.some((pattern) => pattern.test(text))) return "possible_product";
+  return "unknown";
+}
 
 const READ_TOOLS = new Set([
   "read", "grep", "glob", "search", "show", "view", "cat", "ls", "list", "status", "audit", "context",
@@ -104,15 +131,22 @@ function pathLike(value: string): boolean {
  * Non-product targets (tests/docs/examples/fixtures) are L0 even when the
  * surrounding prompt mentions product terms; this keeps balanced mode from
  * blocking routine verification/documentation edits.
+ *
+ * When a user prompt is supplied, the same prompt-intent triage as the hook
+ * runtime applies: a product-flavored prompt with no explicit policy keyword
+ * classifies the mutation as L2, so the manual CLI and the automatic hooks
+ * gate the same intents.
  */
-export function classifyLevelDeterministic(inputs: string[]): GuardLevel {
+export function classifyLevelDeterministic(inputs: string[], prompt?: string): GuardLevel {
   const pathTargets = inputs.filter(pathLike);
   if (pathTargets.length > 0 && pathTargets.every(isNonProductTarget)) return "L0";
-  const joined = inputs.join(" ").toLowerCase();
+  const joined = [...(prompt ? [prompt] : []), ...inputs].join(" ").toLowerCase();
   if (L3_PATTERNS.some((pattern) => pattern.test(joined))) return "L3";
   if (L2_PATTERNS.some((pattern) => pattern.test(joined))) return "L2";
   if (L1_PATTERNS.some((pattern) => pattern.test(joined))) return "L1";
-  if (inputs.length === 0) return "UNKNOWN";
+  if (inputs.length === 0 && !prompt) return "UNKNOWN";
+  const candidate = prompt ? classifyCandidate(prompt) : "unknown";
+  if (candidate === "obvious_product" || candidate === "possible_product") return "L2";
   return "L0";
 }
 

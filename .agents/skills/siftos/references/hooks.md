@@ -185,7 +185,13 @@ Installing still does **not** enable automation.
 ## Runtime
 
 `.product/.runtime/session.json` is disposable state, never canonical product
-memory. Legacy runtimes without intent-scoped guard state do not carry old
+memory. There is **one runtime file per repository**, shared by every coding
+session: concurrent sessions in the same repository (for example parallel
+OpenCode sessions) are not isolated from each other — the most recent hook
+event wins, so turn/guard state must not be assumed to be per-session.
+Canonical product memory and repository config are unaffected.
+
+Legacy runtimes without intent-scoped guard state do not carry old
 `build_anyway`, `prototype`, or `existing_bet` authorization forward.
 
 Writes are atomic to avoid partial/corrupt JSON. The current V2 runtime does
