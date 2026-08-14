@@ -2,9 +2,9 @@
 
 **Product Decision Intelligence for AI-native teams.**
 
-SiftOS is a repository-native agent skill (OpenCode + Codex) that gives
-agents persistent product context and introduces a structured decision
-protocol — decide, challenge, record, review, learn.
+SiftOS is a repository-native agent skill for OpenCode and Codex that gives
+agents persistent product context and a structured decision protocol — shape,
+decide, validate, challenge, build, review and learn.
 
 > **Your product memory belongs to your repository, not your AI vendor.**
 
@@ -12,85 +12,83 @@ protocol — decide, challenge, record, review, learn.
 ![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 [![CI](https://github.com/felipcsousa/siftos/actions/workflows/ci.yml/badge.svg)](https://github.com/felipcsousa/siftos/actions/workflows/ci.yml)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ## The problem
 
 Teams make hundreds of product decisions but rarely preserve the reasoning,
-evidence, assumptions and expectations behind them. Consequences: repeated
-discussions, forgotten rationales, opinion confused with evidence,
-retrospectively rewritten predictions, decisions that outlive their
-assumptions.
+evidence, assumptions and expectations behind them. Coding agents make this
+more acute: an idea can become code before anyone notices that a product
+choice was made.
 
 SiftOS closes the loop:
 
 ```text
-Decision
-  ↓
-Prediction
-  ↓
-Outcome
-  ↓
-Learning
-  ↺
+Decision → Prediction → Outcome → Learning ↺
 ```
 
 ## What SiftOS is
 
-- **A canonical agent skill** — one installation in
-  `.agents/skills/siftos/` works in OpenCode and Codex with identical
-  semantics.
-- **Product Decision Records (PDRs)** — every relevant decision becomes a
-  versioned, human-readable, agent-readable, searchable Markdown file.
-- **Six workflows** — `init`, `decide`, `challenge`, `review`, `show`,
-  `audit`.
-- **Eighteen deterministic linters** — the "Product Slop Detector" —
-  that never depend on the model.
-- **Local-first, Git-native** — persistence is Markdown, history is Git,
-  source of truth is `.product/`. No database, no vendor lock-in.
+- **A canonical agent skill** in `.agents/skills/siftos/`. Product memory and
+  explicit workflows are shared across OpenCode and Codex without migration.
+- **Product Decision Records (PDRs)** — versioned, human-readable and
+  agent-readable Markdown.
+- **Product workflows** — `init`, `decide`, `shape`, `validate`, `challenge`,
+  `prioritize`, `diagnose`, `ship`, `review`, `show`, `audit`, `hooks`.
+- **A deterministic core** for IDs, schemas, lifecycle validation, linting,
+  search, guard policy and Ship Gate checks.
+- **Optional lifecycle adapters**. Installing SiftOS never enables automatic
+  intervention; the user explicitly chooses `advisory`, `balanced`, `strict`
+  or a custom policy.
+- **Local-first, Git-native** — `.product/` is the source of truth. No remote
+  database is required.
 
-SiftOS does not replace human judgment. It makes judgment explicit,
-structured, contestable, verifiable, measurable and historically
-preserved. The human owns every decision.
+SiftOS does not replace human judgment. The human owns every decision.
 
 ## Quickstart
 
 ```bash
-npx siftos install     # installs the skill into .agents/skills/siftos/
+npx siftos install
+siftos init
 ```
 
-Then ask your agent (in OpenCode or Codex):
+Then ask your agent:
 
 ```text
 Initialize SiftOS for this product.
 Should we remove the credit card requirement from trial?
 ```
 
-The agent runs the `init` workflow (builds persistent product context in
-5–10 minutes; missing information stays `Unknown.`) and the `decide`
-workflow (structured analysis, recommendation, dissent, expected
-outcome — ending in your explicit human decision, persisted as a PDR).
+`init` creates a scaffold. Placeholder-only files such as `PRODUCT.md` full
+of `Unknown.` are intentionally reported by `siftos doctor` as **not ready**
+until useful context has been established.
 
-## How it works
+Automatic hooks remain **OFF** after install/init. Opt in explicitly:
 
-### Memory layout
+```bash
+siftos hooks set advisory
+siftos hooks set balanced
+siftos hooks set strict
+```
+
+## Memory layout
 
 ```text
 .product/
-├── PRODUCT.md        durable product context
-├── STRATEGY.md       current strategic objective and bets
-├── METRICS.md        metrics, baselines, targets
-├── PRINCIPLES.md     persistent organizational opinions
-├── decisions/        DEC-XXXX-slug.md
-├── evidence/         supporting material
-└── config.json
+├── PRODUCT.md
+├── STRATEGY.md
+├── METRICS.md
+├── PRINCIPLES.md
+├── ROADMAP.md
+├── config.json
+├── decisions/
+├── evidence/
+├── .runtime/          disposable, gitignored
+└── .index/            derived, gitignored
 ```
 
-The skill definition (`.agents/skills/siftos/`) and the product memory
-(`.product/`) are never mixed: intelligence code and product memory stay
-separate.
+The skill definition and product memory are never mixed.
 
-### Product Decision Record
+## Product Decision Record
 
 ```yaml
 ---
@@ -109,175 +107,193 @@ agent_workflow_version: decide-v1
 ---
 ```
 
-The body separates `Context`, `Goal`, `Facts`, `Evidence`, `Inferences`,
-`Assumptions`, `Unknowns`, `Options Considered`, `Alternatives Rejected`,
-`AI Recommendation`, `Final Human Decision`, `Rationale`, `Strongest
-Argument Against`, `Expected Outcome`, `Primary Metric`, `Guardrails`,
-`Reversibility`, `Cost of Delay`, `What Would Change Our Mind`, `Revisit
-Condition` — plus an `# Outcome` part (`Observed Result`, `Prediction
-Accuracy`, `Decision Assessment`, `Learnings`, ...).
+A PDR separates facts, evidence, inferences, assumptions, unknowns,
+alternatives, AI recommendation, final human decision, expected outcome,
+metrics, guardrails, dissent and revisit conditions. Predictions are written
+before outcomes and preserved through review.
 
-Status lifecycle (unified, V2): a bet and a decision are the same
-artifact in different lifecycle stretches:
+Lifecycle:
 
 ```text
 draft → shaping → validating → ready → accepted → building → shipped → measuring → reviewed
-proposed → accepted | rejected | validating
-accepted → shipped | building | cancelled | superseded
-building → shipped | paused | failed | cancelled | superseded
-shipped → reviewed | measuring | superseded
-paused → building | measuring | cancelled | failed
 ```
 
-v0.2 statuses (`proposed`, `shipped`, `reviewed`, `rejected`, `cancelled`,
-`superseded`) remain valid; existing PDRs migrate without conversion.
+with `proposed`, `rejected`, `cancelled`, `paused`, `failed` and
+`superseded` retained where applicable.
 
-A PDR reaches `accepted` only after an explicit human decision. Original
-predictions are preserved verbatim through review — hindsight rewriting
-is a bug.
+## Workflows
 
-### Workflows
+| Workflow | Purpose |
+| --- | --- |
+| `init` | Build persistent product context progressively. |
+| `decide` | Structure a product choice with evidence, alternatives, dissent and prediction. |
+| `shape` | Turn an idea into a falsifiable Bet with scope and an SVT. |
+| `validate` | Define a Validation Contract before results exist. |
+| `challenge` | Adversarially review an idea/PDR without modifying it. |
+| `prioritize` | Compare Bets using strategy, constraint, evidence, cost and learning value. |
+| `diagnose` | Surface the highest-leverage product health issues. |
+| `ship` | Run the deterministic product Ship Gate. |
+| `review` | Compare prediction with outcome and extract learning. |
+| `show` | Retrieve decision history. |
+| `audit` | Decision Health + deterministic linter findings. |
+| `hooks` | Inspect/change automatic lifecycle policy. |
 
-| Workflow    | Purpose |
-| ----------- | ------- |
-| `init`      | Build persistent product context (progressive, 5–10 min). |
-| `decide`    | Structure a decision: facts, evidence, assumptions, unknowns, alternatives, recommendation, dissent, expected outcome, revisit condition. |
-| `challenge` | Adversarial review of an idea or an existing PDR. Never modifies the PDR. |
-| `review`    | Close the loop: compare prediction with outcome, extract structured learnings. |
-| `show`      | Retrieve decisions by ID, text, tags, status, owner, goal, pending review. |
-| `audit`     | Decision Health: counts, waiting reviews, deterministic linter findings. |
+## Automatic hooks
 
-### Automatic hooks (V2)
+SiftOS separates three states:
 
-SiftOS can observe and, only when configured, gate the coding lifecycle.
-Every hook is independently **Installed / Enabled / Observed** — installing
-adapters never enables them (upgrade from v0.2 keeps hooks off until you
-choose). Presets:
+```text
+Installed ≠ Enabled ≠ Observed
+```
+
+Installing an adapter never enables it. A hook is only active when the user
+has enabled it and the runtime has actually observed it fire.
+
+Presets:
 
 | Preset | Behavior |
 | --- | --- |
-| `off` | Manual SiftOS only; every explicit workflow keeps working. |
-| `advisory` | Observes and advises; never blocks. |
-| `balanced` | Default for new repositories; Product Guard blocks L2/L3 once until resolved. |
-| `strict` | Hard gates L2/L3 and unknown mutations; Ship Gate required. |
-| `custom` | Any per-hook combination (manual edits materialize the config). |
+| `off` | Manual SiftOS only. |
+| `advisory` | Observe/recommend, never block. |
+| `balanced` | Gate unresolved L2/L3 production mutations. |
+| `strict` | Stronger gating, including unknown mutations where applicable. |
+| `custom` | Any per-hook combination. |
 
-Config precedence: session override → `.product/config.json` →
-`~/.siftos/config.json` → preset → defaults. Config lives in
-`.product/config.json` and is committed-able; runtime state lives in
-`.product/.runtime/` and is gitignored.
+Config precedence is session override → repository config → global default →
+preset. `Build anyway` remains available because the human owns the decision.
 
-Product Guard classifies work L0 (technical) / L1 (minor) / L2 (material)
-/ L3 (strategic). The gate is deterministic (level × enforcement); the
-model classifies on agent-executed hooks, a keyword fallback on
-script-executed hooks (Codex adapter). `Build anyway` is always available
-— the human owns the decision.
+### Product Guard semantics
 
-Ship Gate (`siftos ship`) verifies measurement readiness for accepted+
-bets: target user, problem, expected outcome, metric, baseline, success
-threshold, instrumentation, guardrails, review condition, scope. It is
-product lifecycle state, not deployment authorization.
+Product Guard classifies work as L0 technical, L1 minor, L2 material or L3
+strategic. In `balanced`, an unresolved L2/L3 remains blocked **until an
+authorizing resolution exists**. Retrying a tool call is never authorization.
 
-### Linters
+Authorizing resolutions:
 
-| Rule | Check | Severity |
+- `prototype`
+- `existing_bet` pointing to an accepted+ PDR
+- `build_anyway`
+
+`shape`, `validate` and `reconsider` are valid next steps and may update
+`.product/`, but they do **not** silently authorize production mutation.
+
+### Harness capability matrix
+
+Product memory and explicit skills are shared across both harnesses. Automatic
+lifecycle integration is intentionally reported by actual capability rather
+than claimed as perfect parity.
+
+| Capability | Codex | OpenCode |
 | --- | --- | --- |
-| `missing-goal` | no goal associated | WARNING |
-| `missing-alternative` | fewer than 2 options considered | WARNING |
-| `missing-success-metric` | no verifiable outcome | WARNING; ERROR when accepted+ |
-| `missing-review-condition` | no explicit revisit condition | WARNING |
-| `metric-without-baseline` | relative prediction without a real baseline | WARNING |
-| `assumption-as-fact` | same statement in Facts and Assumptions | ERROR |
-| `no-dissent` | no strongest argument against | WARNING |
-| `missing-wwcm` | low/medium confidence without `What Would Change Our Mind` | WARNING |
-| `missing-svt` | validating/ready bet without a Smallest Valuable Test | WARNING |
-| `missing-scope` | building/measuring bet without a defined scope | WARNING |
-| `no-human-decision` | accepted+ without explicit human decision | ERROR |
-| `orphan-decision` | accepted+ without goal/strategy link | ERROR |
-| `stale-review` | review date passed, decision not reviewed | WARNING |
-| `missing-guardrail` | primary metric without guardrail | WARNING |
-| `guardrail-without-baseline` | guardrail without a quantified threshold | WARNING |
-| `stale-evidence` | evidence older than 90/365 days | INFO/WARNING |
-| `gated-evidence` | evidence cites paywalled content | WARNING |
-| `conflicting-status` | invalid field/status combinations | ERROR/WARNING |
+| Shared `.agents/skills/siftos` workflows | Yes | Yes |
+| Before/after mutation guard | Native hook adapter | Native plugin hook |
+| Session lifecycle observation | Yes | Yes |
+| Compaction preservation | `PreCompact` + session context | compaction plugin hook |
+| Prompt-submit context injection | Native `UserPromptSubmit` | No documented 1:1 equivalent; degraded |
+| Stop-style forced closeout continuation | Native `Stop` | No documented 1:1 equivalent; advisory at idle |
 
-`ERROR` findings can block state transitions.
+Codex uses the harness JSON contracts for context injection,
+`PreToolUse.permissionDecision`, and `Stop` continuation. OpenCode installs a
+real repository plugin under `.opencode/plugins/siftos.js` using documented
+before/after tool hooks, session events and compaction context. When exact
+parity is unavailable, `siftos doctor` reports the real installed/observed
+state instead of inventing capability.
 
-### Deterministic core vs. model
+## Ship Gate
 
-IDs, parsing, serialization, schema validation, status transitions,
-linting, search, date checks, audit and discovery are deterministic code —
-the same result in every harness. The model is used only for
-interpretation, analysis, inference, alternatives, adversarial reasoning,
-recommendation and learning extraction. Missing information is `Unknown.`,
-never invented.
+`siftos ship <DEC-XXXX>` checks whether an accepted+ Bet has enough product
+state to be measured: target user, problem/goal, expected outcome/metric,
+measurement readiness, guardrails, revisit condition and scope. It controls
+SiftOS lifecycle state; it is **not** deployment authorization or a security
+boundary.
+
+## Deterministic linters
+
+The current linter set catches structural product-decision problems including
+missing goals/alternatives/metrics/review conditions, assumptions duplicated as
+facts, missing dissent, missing SVTs/scope, missing human decisions, stale
+reviews/evidence, missing guardrails and conflicting status combinations.
+
+These linters are deterministic. Semantic product judgment still belongs to
+the agent workflows; SiftOS does not pretend that string rules alone constitute
+complete product judgment.
 
 ## CLI
 
 ```bash
-siftos install            # install the agent skill
-siftos init               # scaffold .product/
-siftos validate           # parse + schema-validate + lint all PDRs (exit 1 on ERROR)
-siftos audit              # Decision Health report
-siftos search <query>     # --status= --tag= --owner= --goal= --pending-review
-siftos next-id            # next monotonic DEC-XXXX
-siftos show <DEC-XXXX>    # show one decision
-siftos context [<query>]  # compiled context package for agent workflows
-siftos hooks              # show/change the automatic hook policy (--session for overrides)
-siftos hook enable|disable <hook>   # per-hook toggles (converts preset to custom)
-siftos ship <DEC-XXXX>    # deterministic Ship Gate (PASS/FAIL/NOT REQUIRED)
-siftos roadmap            # render the roadmap from active bets (--write persists)
-siftos guard check <p>    # Product Guard: classify + gate a mutation (--level=, --resolution=)
-siftos scope <DEC> <p>    # scope drift: implementation footprint vs bet scope
-siftos doctor             # installation and repository health
+siftos install
+siftos init
+siftos validate
+siftos audit
+siftos search <query>
+siftos next-id
+siftos show <DEC-XXXX>
+siftos context [<query>]
+siftos hooks
+siftos hook enable|disable <hook>
+siftos ship <DEC-XXXX>
+siftos roadmap
+siftos guard check <path>
+siftos scope <DEC-XXXX> <path...>
+siftos doctor
 siftos version
 ```
 
-Global flags: `--dir=<path>`, `--json` where supported. Set
-`SIFTOS_TODAY=YYYY-MM-DD` to pin "today" for deterministic review and
-staleness checks. The skill also ships dependency-free `scripts/` so
-agents can run `init`, `next-decision-id`, `validate`, `audit`, `search`
-and `status` without the npm package.
+Set `SIFTOS_TODAY=YYYY-MM-DD` to pin time-dependent checks in deterministic
+tests.
+
+## `siftos doctor`
+
+Doctor is deliberately adversarial. It distinguishes:
+
+- skill compatibility from lifecycle-adapter installation;
+- installed hooks from enabled hooks;
+- enabled hooks from observed hooks;
+- scaffold files from useful product context.
+
+A directory full of `Unknown.` is a valid scaffold but not a healthy product
+context.
 
 ## Security
 
-- No remote database. Memory lives in the repository.
-- SiftOS writes only inside `.product/` and its own installation.
-- It never commits automatically; it shows `git diff` for the user.
-- Local persistence is not the same as model processing: content read by
-  the agent may be processed by the agent's model provider.
+- No remote SiftOS database is required.
+- Canonical memory lives in the repository.
+- SiftOS never commits automatically.
+- Product Guard is not a security/sandbox boundary.
+- Content read by a coding agent may be processed by that agent's model
+  provider even though SiftOS persistence itself is local.
 
 ## Repository layout
 
 ```text
-src/        deterministic core (schema, parser, serializer, linters, CLI)
-skill/      the canonical agent skill (SKILL.md, references, scripts, assets)
-evals/      cross-platform eval fixtures and runner
-test/       unit and integration tests (vitest)
+src/        deterministic core + shipped CLI entrypoint
+skill/      canonical agent skill, references, scripts and harness adapters
+evals/      deterministic and lifecycle eval suites
+test/       unit/integration tests
 ```
 
 ## Development
 
 ```bash
 npm install
-npm run typecheck   # tsc --noEmit
-npm test            # vitest: 188 tests
-npm run build       # tsc + copy skill into dist/
-node evals/run.mjs  # cross-platform eval suite (deterministic workflows)
+npm run typecheck
+npm test
+npm run build
+node evals/run.mjs
+node evals/hooks/run.mjs
 ```
 
-The eval runner executes the deterministic workflows against five
-realistic decision fixtures and asserts lint findings, exit codes, search
-and audit counts — comparing the CLI against the standalone skill
-scripts. The LLM-dependent workflows (`decide`, `challenge`, `review`)
-require a live harness and are reported as `MANUAL` until exercised in
-OpenCode and Codex.
+CI runs both deterministic workflow evals and lifecycle-hook evals. The latter
+exercise the shipped entrypoint and native adapter contracts so a regression in
+automatic Product Guard cannot be hidden by unit tests of the policy table.
+
+LLM-dependent judgment quality (`decide`, `challenge`, `review`, etc.) still
+requires a separate live behavioral eval harness; deterministic passing tests
+do not claim to prove product-judgment superiority.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) — how to add a linter, an eval
-fixture, a schema field, and the parity contract between the CLI and the
-skill scripts.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
