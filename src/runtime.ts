@@ -5,13 +5,12 @@ import { writeFileAtomic } from "./atomic.js";
 import type { HookConfig, HookName } from "./config.js";
 
 /**
- * SiftOS V2 runtime state (PRD V2 §83–§84, §118).
+ * SiftOS V2 runtime state.
  *
- * `.product/.runtime/session.json` is disposable, non-canonical, normally
- * gitignored, reconstructable, and session-specific. Canonical product
- * memory never lives here; hooks and ship/guard state do.
+ * `.product/.runtime/session.json` is disposable and reconstructable. The
+ * important invariant is that Product Guard authorization is scoped to one
+ * user turn/product intent: retrying a blocked mutation never authorizes it.
  */
-
 export const RUNTIME_DIR = ".runtime";
 export const RUNTIME_SESSION_FILE = "session.json";
 
@@ -24,10 +23,15 @@ export type GuardResolution =
   | "existing_bet"
   | "reconsider"
   | "build_anyway";
+export type GuardStatus = "idle" | "unresolved" | "resolved" | "bypassed";
 
 export interface RuntimeGuardState {
+  /** User turn / product-intent identifier this authorization belongs to. */
+  intent_id: string | null;
+  status: GuardStatus;
   level: GuardLevel | null;
   resolution: GuardResolution | null;
+  /** UX state only: suppresses duplicate explanations, never authorizes. */
   block_issued: boolean;
 }
 
@@ -35,33 +39,43 @@ export interface RuntimeShipGate {
   required: boolean;
   passed: boolean | null;
   result: string | null;
+  /** Prevent Stop hooks from creating continuation loops. */
+  continuations?: number;
 }
 
 export interface RuntimeState {
   session_id: string;
-  /** Per-session hook overrides; expire at session end, survive compaction. */
+  /** Current harness turn id. Changes on every user prompt. */
+  turn_id: string | null;
+  /** Current prompt, used only as disposable runtime context for guard triage. */
+  prompt: string | null;
   hook_overrides: Partial<Record<HookName, Partial<HookConfig>>>;
   candidate: RuntimeCandidate | null;
   guard: RuntimeGuardState;
-  /** Id of the record currently being built (accepted+/building/shipped). */
   active_bet: string | null;
-  mutation: { files: string[] };
+  mutation: { files: string[]; started: boolean };
   ship_gate: RuntimeShipGate;
-  /** Last observed time per logical hook (Installed vs Active evidence). */
   heartbeat: Record<string, string>;
-  /** Local, disposable counters (PRD §128). Disabled hooks never count. */
   metrics: Record<string, number>;
 }
 
 export function defaultRuntime(): RuntimeState {
   return {
     session_id: randomUUID(),
+    turn_id: null,
+    prompt: null,
     hook_overrides: {},
     candidate: null,
-    guard: { level: null, resolution: null, block_issued: false },
+    guard: {
+      intent_id: null,
+      status: "idle",
+      level: null,
+      resolution: null,
+      block_issued: false,
+    },
     active_bet: null,
-    mutation: { files: [] },
-    ship_gate: { required: false, passed: null, result: null },
+    mutation: { files: [], started: false },
+    ship_gate: { required: false, passed: null, result: null, continuations: 0 },
     heartbeat: {},
     metrics: {},
   };
@@ -79,20 +93,39 @@ export function loadRuntime(root: string): RuntimeState {
   const file = runtimeFile(root);
   if (!existsSync(file)) return defaultRuntime();
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<RuntimeState>;
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<RuntimeState> & {
+      guard?: Partial<RuntimeGuardState>;
+      mutation?: { files?: string[]; started?: boolean };
+    };
     const base = defaultRuntime();
+    const guard: RuntimeGuardState = {
+      ...base.guard,
+      ...(parsed.guard ?? {}),
+    };
+    // v0.2/V2 migration: old state only had level/resolution/block_issued.
+    // A previous `block_issued` is never treated as authorization.
+    if (!guard.intent_id) {
+      guard.status = guard.resolution === "build_anyway"
+        ? "bypassed"
+        : guard.resolution === "prototype" || guard.resolution === "existing_bet"
+          ? "resolved"
+          : guard.level
+            ? "unresolved"
+            : "idle";
+    }
     return {
       ...base,
       ...parsed,
+      turn_id: parsed.turn_id ?? base.turn_id,
+      prompt: parsed.prompt ?? base.prompt,
       hook_overrides: { ...base.hook_overrides, ...(parsed.hook_overrides ?? {}) },
-      guard: { ...base.guard, ...(parsed.guard ?? {}) },
+      guard,
       mutation: { ...base.mutation, ...(parsed.mutation ?? {}) },
       ship_gate: { ...base.ship_gate, ...(parsed.ship_gate ?? {}) },
       heartbeat: { ...(parsed.heartbeat ?? {}) },
       metrics: { ...(parsed.metrics ?? {}) },
     };
   } catch {
-    // Corrupted disposable state: start fresh rather than fail.
     return defaultRuntime();
   }
 }
@@ -114,7 +147,29 @@ export function touchHeartbeat(root: string, hook: string): void {
   saveRuntime(root, state);
 }
 
-/** Session end (PRD V2 §81): overrides expire, heartbeat stays. */
+/** Start a fresh product-intent scope for a new user turn. */
+export function startRuntimeTurn(root: string, turnId: string, prompt: string): RuntimeState {
+  const state = loadRuntime(root);
+  if (state.turn_id !== turnId) {
+    state.turn_id = turnId;
+    state.prompt = prompt;
+    state.candidate = null;
+    state.guard = {
+      intent_id: turnId,
+      status: "unresolved",
+      level: null,
+      resolution: null,
+      block_issued: false,
+    };
+    state.active_bet = null;
+    state.mutation = { files: [], started: false };
+    state.ship_gate = { required: false, passed: null, result: null, continuations: 0 };
+  }
+  saveRuntime(root, state);
+  return state;
+}
+
+/** Session end: session overrides expire; canonical product memory is untouched. */
 export function clearSessionOverrides(root: string): void {
   const state = loadRuntime(root);
   state.hook_overrides = {};
