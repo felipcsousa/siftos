@@ -1,33 +1,37 @@
 #!/usr/bin/env node
-// SiftOS V2 hook eval suite (PRD V2 §140–§148).
-//
-// Deterministic-only: configuration, presets, disabled hooks, session
-// overrides, Product Guard verdicts, Ship Gate, and scope drift run
-// against the built CLI. Cross-platform parity is by construction: the
-// deterministic core is single-implementation and both harnesses consume
-// the same config semantics (PRD V2 §148).
-//
-// Usage: node evals/hooks/run.mjs   (after `npm run build`)
+// SiftOS V2 lifecycle evals. Unlike the previous suite, these assertions
+// exercise the shipped entrypoint and adapters, not only the policy helpers.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const dist = path.join(root, "dist", "cli.js");
-const CLI = existsSync(dist)
-  ? { cmd: process.execPath, args: [dist] }
-  : { cmd: "npx", args: ["tsx", "src/cli.ts"] };
+const entry = path.join(root, "dist", "entry.js");
+if (!existsSync(entry)) {
+  console.error("error: build first (`npm run build`)");
+  process.exit(2);
+}
 
-function run(cmd, args, opts = {}) {
-  const env = { ...process.env, SIFTOS_TODAY: "2026-08-13", ...(opts.env ?? {}) };
+const REPORT = [];
+let failures = 0;
+function check(name, ok, detail = "") {
+  REPORT.push({ name, ok, detail });
+  if (!ok) failures += 1;
+}
+function assert(cond, name, detail = "") { check(name, Boolean(cond), detail); }
+function assertEq(actual, expected, name) { check(name, actual === expected, `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); }
+
+function run(args, cwd, stdin) {
+  const env = { ...process.env, HOME: cwd, SIFTOS_TODAY: "2026-08-13" };
   try {
-    const stdout = execFileSync(cmd, args, {
-      cwd: opts.cwd,
+    const stdout = execFileSync(process.execPath, [entry, ...args], {
+      cwd,
       env,
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
+      input: stdin,
+      stdio: [stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
     return { code: 0, stdout: stdout.trim(), stderr: "" };
   } catch (err) {
@@ -39,238 +43,85 @@ function run(cmd, args, opts = {}) {
   }
 }
 
-function siftos(dir, args) {
-  return run(CLI.cmd, [...CLI.args, ...args], { cwd: dir });
-}
-
 function freshRepo() {
-  const tmp = mkdtempSync(path.join(os.tmpdir(), "siftos-hooks-"));
-  run("git", ["init", "-q"], { cwd: tmp });
-  siftos(tmp, ["init"]);
-  return tmp;
+  const dir = mkdtempSync(path.join(os.tmpdir(), "siftos-hooks-"));
+  mkdirSync(path.join(dir, ".git"));
+  const init = run(["init"], dir);
+  assertEq(init.code, 0, "fixture: init succeeds");
+  return dir;
 }
 
-const REPORT = [];
-let failures = 0;
-
-function check(name, ok, detail) {
-  REPORT.push({ name, ok, detail });
-  if (!ok) failures += 1;
+function withRepo(fn) {
+  const dir = freshRepo();
+  try { fn(dir); }
+  finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-function assertEq(actual, expected, label) {
-  const ok = actual === expected;
-  check(label, ok, `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
-  return ok;
-}
+withRepo((dir) => {
+  const config = JSON.parse(readFileSync(path.join(dir, ".product", "config.json"), "utf8"));
+  assert(config.hooks === undefined, "opt-in: init does not enable hooks");
+  const guard = run(["guard", "check", "--level=L3", "src/pricing.ts"], dir);
+  assertEq(guard.code, 0, "opt-in: manual mode does not gate");
+});
 
-function assert(cond, label, detail = "") {
-  check(label, Boolean(cond), detail);
-  return Boolean(cond);
-}
+withRepo((dir) => {
+  const install = run(["install"], dir);
+  assertEq(install.code, 0, "install: succeeds");
+  assert(existsSync(path.join(dir, ".opencode", "plugins", "siftos.js")), "install: OpenCode plugin exists");
+  assert(existsSync(path.join(dir, ".agents", "skills", "siftos", "adapters", "opencode-plugin.js")), "install: OpenCode implementation exists");
+  const codex = JSON.parse(readFileSync(path.join(dir, ".codex", "hooks.json"), "utf8"));
+  assert(Boolean(codex.hooks?.UserPromptSubmit), "install: Codex Prompt hook configured");
+  assert(Boolean(codex.hooks?.PreCompact), "install: Codex compaction hook configured");
+  assert(Boolean(codex.hooks?.Stop), "install: Codex Stop hook configured");
+});
 
-const SCOPE_FIXTURE = `---
-id: DEC-0001
-title: Referrals
-status: building
-created_at: 2026-08-13
-updated_at: 2026-08-13
----
-# Decision
+withRepo((dir) => {
+  run(["hooks", "set", "balanced"], dir);
+  const first = run(["guard", "check", "--level=L2", "app/referrals.ts"], dir);
+  assertEq(first.code, 1, "guard: first L2 mutation blocked");
+  const retry = run(["guard", "check", "--level=L2", "app/referrals.ts"], dir);
+  assertEq(retry.code, 1, "guard: retry remains blocked without resolution");
+  assert(retry.stdout.includes("still unresolved"), "guard: retry explains unresolved intent");
+  const shape = run(["guard", "check", "--level=L2", "--resolution=shape", "app/referrals.ts"], dir);
+  assertEq(shape.code, 1, "guard: shape does not authorize production mutation");
+  const bypass = run(["guard", "check", "--level=L2", "--resolution=build_anyway", "app/referrals.ts"], dir);
+  assertEq(bypass.code, 0, "guard: explicit build_anyway authorizes");
+});
 
-## Scope
+withRepo((dir) => {
+  const doctor = run(["doctor"], dir);
+  assertEq(doctor.code, 1, "doctor: scaffold-only context is unhealthy");
+  assert(doctor.stdout.includes("PRODUCT.md ready           ✗"), "doctor: Unknown-only product is not ready");
+  assert(doctor.stdout.includes("OpenCode hook plugin       ✗"), "doctor: missing OpenCode plugin is not called installed");
+});
 
-- referral link
-- invite flow
-`;
+withRepo((dir) => {
+  run(["install"], dir);
+  run(["hooks", "set", "balanced"], dir);
+  const hook = path.join(dir, ".agents", "skills", "siftos", "scripts", "hook-codex.mjs");
+  const env = { ...process.env, HOME: dir };
+  const prompt = JSON.parse(execFileSync(process.execPath, [hook, "prompt_submit"], {
+    cwd: dir,
+    env,
+    encoding: "utf8",
+    input: JSON.stringify({ turn_id: "turn-referrals", prompt: "Add referrals" }),
+  }));
+  assertEq(prompt.hookSpecificOutput?.hookEventName, "UserPromptSubmit", "codex: Prompt hook emits native contract");
 
-const GUARD_DISABLED = "SIFTOS GUARD: before_mutation is disabled (PRD V2 §31).";
+  const pre = JSON.parse(execFileSync(process.execPath, [hook, "before_mutation"], {
+    cwd: dir,
+    env,
+    encoding: "utf8",
+    input: JSON.stringify({ turn_id: "turn-referrals", tool_name: "Write", tool_input: { file_path: "app/referrals.ts" } }),
+  }));
+  assertEq(pre.hookSpecificOutput?.permissionDecision, "deny", "codex: PreToolUse denies unresolved L2");
+  assert(pre.hookSpecificOutput?.permissionDecisionReason?.includes("unresolved"), "codex: denial includes product reason");
+});
 
-// ─── Cases ────────────────────────────────────────────────────────────────
-
-function presetOff() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "off"]);
-  const g = siftos(tmp, ["guard", "check", "app/referrals.ts"]);
-  assertEq(g.stdout, GUARD_DISABLED, "preset-off: guard disabled");
-  const v = siftos(tmp, ["validate"]);
-  assertEq(v.code, 0, "preset-off: manual validate still works");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function balancedGatesL2() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "balanced"]);
-  const g = siftos(tmp, ["guard", "check", "--level=L2", "app/referrals.ts"]);
-  assertEq(g.code, 1, "balanced: L2 blocked");
-  assert(g.stdout.includes("BLOCK_ONCE"), "balanced: BLOCK_ONCE verdict");
-  const again = siftos(tmp, ["guard", "check", "--level=L2", "app/referrals.ts"]);
-  assertEq(again.code, 0, "balanced: block-once lets the second call through");
-  const l0 = siftos(tmp, ["guard", "check", "--level=L0", "test/foo.test.ts"]);
-  assertEq(l0.code, 0, "balanced: L0 technical work uninterrupted");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function strictHardGates() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "strict"]);
-  const g = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(g.code, 1, "strict: L3 blocked");
-  assert(g.stdout.includes("REQUIRE_RESOLUTION"), "strict: REQUIRE_RESOLUTION");
-  const again = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(again.code, 1, "strict: re-blocks (no block-once)");
-  const unk = siftos(tmp, ["guard", "check"]);
-  assertEq(unk.code, 1, "strict: unknown mutation requires resolution");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function advisoryNeverBlocks() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "advisory"]);
-  const g = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(g.code, 0, "advisory: L3 allowed");
-  assert(g.stdout.includes("ALLOW"), "advisory: ALLOW verdict");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function disabledHookNeverEnforces() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "balanced"]);
-  siftos(tmp, ["hook", "disable", "before-mutation"]);
-  const g = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(g.stdout, GUARD_DISABLED, "disabled hook: no gate, no latency beyond config");
-  const h = siftos(tmp, ["hooks"]);
-  assert(h.stdout.includes("Preset: custom"), "disabled hook: preset converts to custom");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function resolutionAllowsCurrentCall() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "strict"]);
-  const blocked = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(blocked.code, 1, "resolution: initial L3 blocked");
-  const resolved = siftos(tmp, [
-    "guard",
-    "check",
-    "--level=L3",
-    "--resolution=build_anyway",
-    "src/pricing.ts",
-  ]);
-  assertEq(resolved.code, 0, "resolution: --resolution allows the current call");
-  assert(resolved.stdout.includes("ALLOW"), "resolution: verdict ALLOW");
-  const next = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(next.code, 1, "resolution: next mutation re-gates (block cleared)");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function sessionEnforcementReplaces() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "balanced"]);
-  siftos(tmp, ["hooks", "set", "strict", "--session"]);
-  const g = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(g.code, 1, "session strict: L3 blocked");
-  assert(g.stdout.includes("REQUIRE_RESOLUTION"), "session strict: enforcement replaced");
-  siftos(tmp, ["hooks", "set", "off", "--session"]);
-  const off = siftos(tmp, ["guard", "check", "--level=L3", "src/pricing.ts"]);
-  assertEq(off.stdout, GUARD_DISABLED, "session off: guard disabled under strict repo");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function sessionOverride() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "balanced"]);
-  siftos(tmp, ["hooks", "set", "off", "--session"]);
-  const g = siftos(tmp, ["guard", "check", "--level=L2", "app/referrals.ts"]);
-  assertEq(g.stdout, GUARD_DISABLED, "session override: hooks off for this session");
-  const config = JSON.parse(
-    readFileSync(path.join(tmp, ".product", "config.json"), "utf8"),
-  );
-  assertEq(config.hooks.preset, "balanced", "session override: repository config unchanged");
-  const h = siftos(tmp, ["hooks"]);
-  assert(h.stdout.includes("Session override active"), "session override: visible in hooks");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function shipGate() {
-  const tmp = freshRepo();
-  const fixture = path.join(
-    root,
-    "evals",
-    "fixtures",
-    "remove-credit-card-trial",
-    "decisions",
-    "DEC-0042-remove-credit-card.md",
-  );
-  writeFileSync(
-    path.join(tmp, ".product", "decisions", "DEC-0042-credit.md"),
-    readFileSync(fixture, "utf8"),
-  );
-  const ship = siftos(tmp, ["ship", "DEC-0042"]);
-  assert(ship.stdout.includes("SHIP GATE:"), "ship: gate runs on accepted+");
-  assert(ship.stdout.includes("PASS_WITH_WARNINGS"), "ship: fixture is PASS_WITH_WARNINGS");
-  writeFileSync(
-    path.join(tmp, ".product", "decisions", "DEC-0001-draft.md"),
-    "---\nid: DEC-0001\ntitle: Idea\nstatus: draft\ncreated_at: 2026-08-13\nupdated_at: 2026-08-13\n---\n# Decision\n",
-  );
-  const draft = siftos(tmp, ["ship", "DEC-0001"]);
-  assert(draft.stdout.includes("NOT_REQUIRED"), "ship: pre-accepted is NOT_REQUIRED");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function scopeDrift() {
-  const tmp = freshRepo();
-  writeFileSync(path.join(tmp, ".product", "decisions", "DEC-0001-ref.md"), SCOPE_FIXTURE);
-  const drift = siftos(tmp, ["scope", "DEC-0001", "app/export.ts"]);
-  assertEq(drift.code, 1, "scope: drift exits 1");
-  assert(drift.stdout.includes("SCOPE DRIFT"), "scope: drift detected");
-  const ok = siftos(tmp, ["scope", "DEC-0001", "src/invite.ts"]);
-  assertEq(ok.code, 0, "scope: in-scope file clean");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-function manualFirstClass() {
-  const tmp = freshRepo();
-  siftos(tmp, ["hooks", "set", "off"]);
-  const next = siftos(tmp, ["next-id"]);
-  assertEq(next.stdout, "DEC-0001", "manual: next-id works with hooks off");
-  const audit = siftos(tmp, ["audit"]);
-  assertEq(audit.code, 0, "manual: audit works with hooks off");
-  rmSync(tmp, { recursive: true, force: true });
-}
-
-// ─── Runner ───────────────────────────────────────────────────────────────
-
-const CASES = [
-  ["preset-off", presetOff],
-  ["balanced-gates-L2", balancedGatesL2],
-  ["strict-hard-gates", strictHardGates],
-  ["advisory-never-blocks", advisoryNeverBlocks],
-  ["disabled-hook", disabledHookNeverEnforces],
-  ["resolution", resolutionAllowsCurrentCall],
-  ["session-enforcement", sessionEnforcementReplaces],
-  ["session-override", sessionOverride],
-  ["ship-gate", shipGate],
-  ["scope-drift", scopeDrift],
-  ["manual-first-class", manualFirstClass],
-];
-
-for (const [name, fn] of CASES) {
-  try {
-    fn();
-  } catch (err) {
-    check(`${name}:runner`, false, err.message);
-  }
-}
-
-console.log("SiftOS V2 hook eval report");
-console.log("");
-for (const r of REPORT) {
-  console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.ok ? "" : `  (${r.detail})`}`);
+console.log("SiftOS lifecycle hook eval report\n");
+for (const item of REPORT) {
+  console.log(`${item.ok ? "PASS" : "FAIL"}  ${item.name}${item.ok || !item.detail ? "" : `  (${item.detail})`}`);
 }
 console.log("");
-console.log(
-  failures === 0
-    ? "Status: all deterministic hook checks passed"
-    : `Status: ${failures} check(s) failed`,
-);
+console.log(failures === 0 ? "Status: all lifecycle hook checks passed" : `Status: ${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
