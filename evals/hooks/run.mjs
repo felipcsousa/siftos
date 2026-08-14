@@ -101,7 +101,8 @@ withRepo((dir) => {
   assertEq(run(["guard", "check", turn, "--level=L2", "--resolution=build_anyway", "app/referrals.ts"], dir).code, 0, "guard: explicit build_anyway authorizes");
 });
 
-// A1: malformed per-hook override must resolve OFF in both CLI and standalone runtime.
+// A1: malformed per-hook override is rejected consistently and the mutation
+// boundary fails closed instead of interpreting the malformed object differently.
 withRepo((dir) => {
   const configPath = path.join(dir, ".product", "config.json");
   const config = JSON.parse(readFileSync(configPath, "utf8"));
@@ -115,8 +116,8 @@ withRepo((dir) => {
     cwd: dir, env: { ...process.env, HOME: dir }, encoding: "utf8",
     input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: "src/pricing.ts" } }),
   }));
-  assert(!out.hookSpecificOutput?.permissionDecision, "config parity: malformed config cannot activate Codex guard");
-  assert(String(out.systemMessage ?? "").includes("disabled"), "config parity: malformed config is visible, not silent");
+  assertEq(out.hookSpecificOutput?.permissionDecision, "deny", "config parity: malformed guard config fails closed in Codex");
+  assert(String(out.hookSpecificOutput?.permissionDecisionReason ?? "").includes("configuration error"), "config parity: malformed config denial is explicit");
 });
 
 // M3/M5: classifier is intentionally narrower and shell effects are explicit.
