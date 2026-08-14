@@ -1,121 +1,138 @@
 # Hooks — user-controlled automation
 
-SiftOS can observe and, only when configured, gate parts of the coding
-lifecycle. Every hook is independently **Installed** (real adapter capability),
-**Enabled** (user config), and **Observed** (runtime saw it execute).
-
-Installing or initializing SiftOS never enables automatic hooks. Missing
-`hooks` configuration means automatic mode is off.
+SiftOS can observe and, only when configured, gate parts of the coding lifecycle.
+Every hook has distinct **Installed**, **Enabled**, and **Observed** state.
+Installing or initializing SiftOS never enables automatic hooks.
 
 ## Policy
 
-- Repository: `.product/config.json`
-- Session override: `.product/.runtime/session.json` (highest precedence)
-- Global default: `~/.siftos/config.json`
-- Presets: `off`, `advisory`, `balanced`, `strict`, `custom`
+Configuration precedence:
 
-Read effective state with `siftos hooks`. Disabled means disabled.
+```text
+session override
+↓
+.product/config.json
+↓
+~/.siftos/config.json
+↓
+preset defaults
+```
 
-Per-hook repository entries are strict: when a known hook entry is present it
-must include `enabled: true|false`. A malformed hook block is **not** partially
-merged. Both the CLI and standalone adapters disable automatic hooks and expose
-a configuration error until `.product/config.json` is fixed. A malformed file
-must never produce `OFF` in the CLI and active enforcement in a harness.
+Presets: `off`, `advisory`, `balanced`, `strict`, `custom`.
+
+Known per-hook entries are strict. If an entry exists it must contain
+`enabled: true|false`; optional `enforcement` and `failure_policy` must also be
+valid enum values. A malformed hook block is never partially interpreted.
+
+**Policy ambiguity is fail-closed at the mutation boundary:**
+
+- `siftos hooks`, `siftos guard`, and `siftos doctor` report the invalid config;
+- Codex/OpenCode `before_mutation` denies mutation with an explicit
+  configuration-error reason;
+- non-critical lifecycle hooks remain inert until `.product/config.json` is
+  repaired.
+
+This prevents the CLI from reporting OFF while a harness independently infers
+an active policy, or vice versa.
 
 ## Product Guard invariant
 
-The Guard is scoped to the current user turn/product intent.
+The Guard is scoped to the current product intent.
 
 ```text
-blocked intent
-    ↓ retry mutation
-still blocked
-    ↓ explicit authorization
-prototype | accepted existing_bet | build_anyway
-    ↓
+unresolved intent
+  ↓ mutation
+BLOCK
+  ↓ retry
+BLOCK
+  ↓ explicit authorization
+prototype | active existing_bet | build_anyway
+  ↓
 ALLOW
 ```
 
-`block_issued` only suppresses repetitive explanation. It never authorizes a
-second mutation attempt. `shape`, `validate`, and `reconsider` are legitimate
-next steps but leave production mutation unresolved.
+`block_issued` is UX state only. It never authorizes a retry.
 
-Manual `siftos guard` calls are independent intents unless the caller supplies
-the same explicit `--turn-id`. A prior manual `build_anyway` therefore does not
-authorize unrelated later CLI calls.
+`existing_bet` is build-authorizing only for an active Bet in one of:
 
-## Guard classification
+```text
+accepted
+building
+shipped
+measuring
+```
 
-The deterministic fallback is intentionally conservative about false positives:
+`shape`, `validate`, and `reconsider` are valid reasoning steps but do not
+silently authorize production mutation.
 
-- tests, docs, examples and fixtures are non-product targets and resolve L0;
+Manual `siftos guard` invocations are separate intents by default. Reuse an
+explicit `--turn-id` only when intentionally continuing the same intent. This
+keeps a manual `build_anyway` from becoming sticky across unrelated commands.
+
+## Deterministic classification
+
+The TypeScript CLI and standalone hook runtime consume the same policy data.
+The fallback classifier is deliberately conservative about false positives:
+
+- tests, docs, examples, fixtures, Markdown and snapshots are non-product
+  targets and resolve L0;
 - generic words such as `team`, `trial`, `activation`, or `plan` are not enough
-  by themselves to create an L2/L3 gate;
-- explicit capabilities such as referrals, OAuth/login, onboarding,
-  notifications, permissions and workspaces are L2;
+  by themselves to create L2/L3;
+- referrals, user invitations, OAuth/login, onboarding, notifications,
+  permissions, workspaces and explicit integrations are L2 examples;
 - pricing, billing, subscriptions, payments, marketplace and business-model
-  changes are L3.
+  changes are L3 examples.
 
-The same policy data is consumed by the TypeScript core and the standalone
-hook runtime. Evals assert parity.
+Tool effect and product level are separate. `npm test` and typecheck are
+verification; `npm run build` is a mutation because it may write artifacts.
+SiftOS is still product-judgment tooling, not a security sandbox.
 
-Shell effects are separate from product level. `npm test` / typecheck are
-verification. `npm run build` is treated as a mutation because it may write
-artifacts. SiftOS is still product-judgment tooling, not a security sandbox.
-
-## Codex adapter
+## Codex
 
 Codex uses native lifecycle contracts:
 
-| Logical behavior | Codex hook | Behavior |
+| SiftOS behavior | Codex hook | Behavior |
 | --- | --- | --- |
-| Session context | `SessionStart` | returns Product Context Capsule through `additionalContext` |
-| Prompt intake | `UserPromptSubmit` | starts a fresh turn/intent and returns advisory context |
-| Mutation gate | `PreToolUse` | returns `permissionDecision: deny` for unresolved gated changes |
-| Mutation tracking | `PostToolUse` | records only actual mutating tool effects |
-| Compaction | `PreCompact` | preserves runtime state; the next SessionStart can reload repository context |
-| Closeout | `Stop` | balanced/strict may return `{decision: "block", reason}` once when Ship Gate needs attention |
+| Session context | `SessionStart` | Product Context Capsule via `additionalContext` |
+| Prompt intake | `UserPromptSubmit` | starts a fresh intent and injects advisory context |
+| Mutation gate | `PreToolUse` | `permissionDecision: deny` while unresolved |
+| Mutation tracking | `PostToolUse` | records actual mutation effects only |
+| Compaction | `PreCompact` | preserves runtime state for reload |
+| Closeout | `Stop` | balanced/strict may request one continuation |
 | Cleanup | `SessionEnd` | clears session-only state |
 
-Never emulate Codex denial with a magic exit code when the harness provides a
-permission-decision contract. Never create a Stop loop; honor
-`stop_hook_active` and the one-continuation runtime limit.
+Never use retry as authorization. Never create a Stop loop: the runtime caps
+closeout continuation at one and honors the harness Stop-active signal.
 
-## OpenCode adapter
+## OpenCode
 
-OpenCode installs a real repository-local plugin:
+SiftOS installs a repository-local plugin at:
 
 ```text
 .opencode/plugins/siftos.js
 ```
 
-with the implementation in:
+with canonical implementation under the installed skill.
 
-```text
-.agents/skills/siftos/adapters/opencode-plugin.js
-```
+Native coverage includes:
 
-Supported native lifecycle points:
+- `tool.execute.before` for mutation gating;
+- `tool.execute.after` for mutation tracking (read-only tools are ignored);
+- session lifecycle events, with a fresh runtime scope on each observed
+  `session.created`;
+- compaction context;
+- `session.idle` advisory closeout.
 
-| Logical behavior | OpenCode plugin surface |
-| --- | --- |
-| Before mutation | `tool.execute.before` (throws to block) |
-| After mutation | `tool.execute.after`; read-only tools do not enter mutation footprint |
-| Session observation | plugin `event` session lifecycle; each `session.created` gets fresh runtime scope |
-| Compaction context | `experimental.session.compacting` |
-| Closeout | `session.idle`, advisory only |
+OpenCode does not currently have a documented 1:1 equivalent to the Codex
+`UserPromptSubmit` + forced `Stop` continuation contracts used here. Do not
+claim parity. At idle, SiftOS uses an attached Bet when present; otherwise it
+may derive a Bet only when exactly one PDR is `building`. If no unique Bet can
+be attached, it reports that implementation mutations occurred without a
+unique active Bet instead of pretending a Ship Gate ran.
 
-OpenCode does **not** currently expose documented 1:1 equivalents for Codex
-`UserPromptSubmit` context injection or Stop-style forced continuation. Do not
-claim those are implemented. Product Guard still protects mutations through
-`tool.execute.before`; explicit SiftOS workflows remain fully available.
+## Presets
 
-At idle, if no Bet was explicitly attached, closeout can derive an active Bet
-only when there is exactly one `building` PDR. Otherwise it emits an advisory
-that mutations occurred without a unique active Bet instead of silently
-pretending a Ship Gate ran.
-
-## Preset behavior
+Guard behavior:
 
 ```text
              advisory       balanced                  strict
@@ -126,74 +143,66 @@ L3           ALLOW+advice   BLOCK until resolution    REQUIRE resolution
 UNKNOWN      ALLOW          ALLOW                     REQUIRE resolution
 ```
 
-Turn closeout behavior:
+Closeout:
 
 ```text
 advisory   report only
-balanced   may request one Codex continuation when Ship Gate needs attention
-strict     may request one Codex continuation when Ship Gate needs attention
+balanced   Codex may request one continuation when Ship Gate needs attention
+strict     Codex may request one continuation when Ship Gate needs attention
 ```
-
-A user bypass is always available by default because Product Guard is product
-judgment tooling, not an organizational security boundary.
-
-## Runtime state
-
-`.product/.runtime/session.json` is disposable and may contain:
-
-```text
-session_id
-turn_id
-prompt/candidate
-current guard intent + resolution
-active_bet
-mutation footprint
-Ship Gate closeout state
-hook heartbeat
-session overrides
-```
-
-Canonical decisions/evidence/strategy never live only in runtime state. Legacy
-runtime files without an intent-scoped guard status never carry historical
-`build_anyway`, `prototype`, or `existing_bet` authorization forward.
 
 ## Ship Gate parity
 
-Manual `siftos ship` and automatic closeout use the same status policy and the
-same deterministic checks: target user, problem/goal, expected outcome/metric,
-success threshold, baseline, instrumentation, guardrails, revisit condition
-and scope. `reviewed` and `superseded` are historical/terminal states and do
-not count as active build authorization.
+Manual `siftos ship` and automatic closeout share the same active status set and
+the same deterministic checks:
+
+- target user;
+- problem/goal;
+- expected outcome / primary metric;
+- success threshold;
+- baseline;
+- instrumentation;
+- guardrails;
+- revisit condition;
+- scope.
+
+`reviewed` and `superseded` are history/terminal states, not active build
+authorization, and therefore return `NOT_REQUIRED` from the Ship Gate.
 
 ## Installation safety
 
-`siftos install` preserves non-SiftOS Codex hook entries and refuses to
-silently overwrite an existing `.opencode/plugins/siftos.js` that is not
-managed by SiftOS. Reinstalling the skill replaces its own skill directory so
-removed package files do not survive as stale artifacts.
+`siftos install`:
 
-## Failure policy
+- preserves non-SiftOS entries in existing `.codex/hooks.json`;
+- replaces prior SiftOS Codex entries instead of duplicating them;
+- refuses to overwrite `.opencode/plugins/siftos.js` if that file is not
+  SiftOS-managed;
+- replaces its own skill directory on reinstall so removed package files do
+  not remain as stale artifacts.
 
-- `advisory` / `balanced`: fail open by default, with visible diagnostic.
-- `strict before_mutation`: may fail closed.
-- A hook failure must never silently masquerade as successful enforcement.
-- Invalid repository hook configuration disables automation visibly instead of
-  being interpreted differently by the CLI and adapters.
+Installing still does **not** enable automation.
 
-## Capability honesty
+## Runtime
 
-`siftos doctor` distinguishes core health from automation health and reports:
+`.product/.runtime/session.json` is disposable state, never canonical product
+memory. Legacy runtimes without intent-scoped guard state do not carry old
+`build_anyway`, `prototype`, or `existing_bet` authorization forward.
 
-```text
-skill available
-adapter installed
-hook enabled
-hook observed
-automation off | healthy | degraded
-```
+Writes are atomic to avoid partial/corrupt JSON. The current V2 runtime does
+not claim transactional multi-process semantics for concurrent independent
+read-modify-write operations; coding-agent hook execution is expected to be
+serialized by the harness. If a future harness runs these hooks concurrently,
+add an explicit runtime transaction/lock rather than claiming atomic rename
+solves lost updates.
 
-A manual-only repository can be healthy without lifecycle adapters. A
-directory called `.opencode/` is not evidence of an installed OpenCode adapter,
-and a hooks JSON file is not proof that every logical hook is supported.
-Doctor reports real artifacts and observed heartbeats, not intended
+## Doctor / capability honesty
+
+`siftos doctor` separates core health from automation health. A manual-only
+repository can be healthy without either lifecycle adapter. Automation is
+reported independently as `off`, `healthy`, or `degraded`, and each hook reports
+Installed / Enabled / Observed state.
+
+A directory named `.opencode/` is not proof of an OpenCode adapter, and an
+arbitrary hooks JSON is not proof of Codex coverage. Doctor inspects the real
+SiftOS adapter artifacts and configuration instead of confirming intended
 architecture.
