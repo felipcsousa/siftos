@@ -8,6 +8,7 @@ import {
   defaultRuntime,
   loadRuntime,
   saveRuntime,
+  startRuntimeTurn,
   touchHeartbeat,
 } from "../src/runtime.js";
 
@@ -19,32 +20,63 @@ function fresh() {
   return tmp;
 }
 
-describe("runtime state (PRD V2 §83–§84)", () => {
-  it("round-trips nested state without clobbering defaults", () => {
+describe("runtime state", () => {
+  it("round-trips turn-scoped guard state without clobbering defaults", () => {
     const root = fresh();
     const state = loadRuntime(root);
-    state.guard = { level: "L2", resolution: "existing_bet", block_issued: true };
-    state.mutation = { files: ["src/a.ts"] };
+    state.turn_id = "turn-1";
+    state.guard = {
+      intent_id: "turn-1",
+      status: "resolved",
+      level: "L2",
+      resolution: "existing_bet",
+      block_issued: true,
+    };
+    state.mutation = { files: ["src/a.ts"], started: true };
     state.hook_overrides = { before_mutation: { enabled: false } };
     saveRuntime(root, state);
 
     const loaded = loadRuntime(root);
-    expect(loaded.guard).toEqual({ level: "L2", resolution: "existing_bet", block_issued: true });
-    expect(loaded.mutation.files).toEqual(["src/a.ts"]);
+    expect(loaded.guard).toEqual({
+      intent_id: "turn-1",
+      status: "resolved",
+      level: "L2",
+      resolution: "existing_bet",
+      block_issued: true,
+    });
+    expect(loaded.mutation).toEqual({ files: ["src/a.ts"], started: true });
     expect(loaded.hook_overrides.before_mutation).toEqual({ enabled: false });
-    // untouched nested keys keep defaults
-    expect(loaded.ship_gate).toEqual({ required: false, passed: null, result: null });
+    expect(loaded.ship_gate).toEqual({ required: false, passed: null, result: null, continuations: 0 });
     expect(typeof loaded.session_id).toBe("string");
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("a partial runtime file merges with defaults instead of clobbering", () => {
+  it("migrates old runtime files without treating block_issued as authorization", () => {
     const root = fresh();
-    saveRuntime(root, { ...defaultRuntime(), guard: { level: "L3", resolution: null, block_issued: false } });
+    writeFileSync(
+      path.join(root, ".product", ".runtime", "session.json"),
+      JSON.stringify({ guard: { level: "L2", resolution: null, block_issued: true } }),
+    );
     const loaded = loadRuntime(root);
-    expect(loaded.guard.level).toBe("L3");
-    expect(loaded.mutation).toEqual({ files: [] });
-    expect(loaded.metrics).toEqual({});
+    expect(loaded.guard.status).toBe("unresolved");
+    expect(loaded.guard.block_issued).toBe(true);
+    expect(loaded.guard.intent_id).toBeNull();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("startRuntimeTurn resets authorization when the harness turn changes", () => {
+    const root = fresh();
+    const first = startRuntimeTurn(root, "turn-1", "build anyway");
+    first.guard.status = "bypassed";
+    first.guard.resolution = "build_anyway";
+    saveRuntime(root, first);
+
+    const second = startRuntimeTurn(root, "turn-2", "add referrals");
+    expect(second.turn_id).toBe("turn-2");
+    expect(second.guard.intent_id).toBe("turn-2");
+    expect(second.guard.status).toBe("unresolved");
+    expect(second.guard.resolution).toBeNull();
+    expect(second.guard.block_issued).toBe(false);
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -53,6 +85,7 @@ describe("runtime state (PRD V2 §83–§84)", () => {
     writeFileSync(path.join(root, ".product", ".runtime", "session.json"), "{not json");
     const loaded = loadRuntime(root);
     expect(loaded.session_id).toBeTruthy();
+    expect(loaded.guard.status).toBe("idle");
     expect(loaded.guard.block_issued).toBe(false);
     rmSync(tmp, { recursive: true, force: true });
   });
@@ -68,16 +101,18 @@ describe("runtime state (PRD V2 §83–§84)", () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("clearSessionOverrides keeps the rest of the session state", () => {
+  it("clearSessionOverrides keeps product-intent state", () => {
     const root = fresh();
-    const state = loadRuntime(root);
+    const state = defaultRuntime();
     state.hook_overrides = { before_mutation: { enabled: false } };
     state.active_bet = "DEC-0001";
+    state.turn_id = "turn-1";
     saveRuntime(root, state);
     clearSessionOverrides(root);
     const loaded = loadRuntime(root);
     expect(loaded.hook_overrides).toEqual({});
     expect(loaded.active_bet).toBe("DEC-0001");
+    expect(loaded.turn_id).toBe("turn-1");
     rmSync(tmp, { recursive: true, force: true });
   });
 });
