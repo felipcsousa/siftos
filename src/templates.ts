@@ -1,4 +1,4 @@
-/** Init scaffold content (PRD §§17–21). Missing information stays "Unknown." (NFR-009). */
+/** Init scaffold content. Missing information stays "Unknown.". */
 
 export const PRODUCT_TEMPLATE = `# Product
 
@@ -172,16 +172,15 @@ A decision file itself records inline evidence with provenance:
 \`Source: unspecified\` is a valid value. Never invent a source.
 `;
 
+// Installing/scaffolding SiftOS never opts the user into automatic
+// intervention. Hooks are intentionally absent until `siftos hooks set ...`
+// is run. Installed != enabled.
 export const CONFIG_TEMPLATE = JSON.stringify(
   {
     version: 2,
     name: "siftos",
     platforms: ["opencode", "codex"],
     linters: { enabled: true },
-    // PRD V2 §43: minimal until customized. New repositories default to
-    // `balanced`; upgraded v0.2 repositories keep hooks absent (disabled)
-    // until the user explicitly chooses a preset (PRD V2 §45/§186).
-    hooks: { preset: "balanced" },
   },
   null,
   2,
@@ -189,9 +188,9 @@ export const CONFIG_TEMPLATE = JSON.stringify(
 
 export const ROADMAP_TEMPLATE = `# Product Roadmap
 
-Only active bets belong on the roadmap (PRD V2 §92). A bet is a product
-investment under uncertainty; keep it here while it is being shaped,
-validated, built, or measured.
+Only active bets belong on the roadmap. A bet is a product investment under
+uncertainty; keep it here while it is being shaped, validated, built, or
+measured.
 
 ## NOW
 
@@ -209,4 +208,3 @@ Unknown.
 
 Unknown.
 `;
-

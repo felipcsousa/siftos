@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "bin": {
-    "siftos": "dist/cli.js"
+    "siftos": "dist/entry.js"
   },
   "files": [
     "dist",
