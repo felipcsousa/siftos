@@ -60,7 +60,7 @@ Users need a referral path.
 ## Target User
 Self-service SMB.
 ## Expected Outcome
-Activation increases by 5%.
+Activation increases materially.
 ## Primary Metric
 Activation rate.
 ## Guardrails
@@ -101,15 +101,12 @@ withRepo((dir) => {
   assertEq(run(["guard", "check", turn, "--level=L2", "--resolution=build_anyway", "app/referrals.ts"], dir).code, 0, "guard: explicit build_anyway authorizes");
 });
 
-// A1: malformed per-hook override is rejected consistently and the mutation
-// boundary fails closed instead of interpreting the malformed object differently.
 withRepo((dir) => {
   const configPath = path.join(dir, ".product", "config.json");
   const config = JSON.parse(readFileSync(configPath, "utf8"));
   config.hooks = { preset: "balanced", before_mutation: { enforcement: "strict" } };
   writeFileSync(configPath, JSON.stringify(config, null, 2));
-  const cli = run(["hooks"], dir);
-  assertEq(cli.code, 1, "config parity: CLI rejects malformed per-hook override");
+  assertEq(run(["hooks"], dir).code, 1, "config parity: CLI rejects malformed per-hook override");
   run(["install"], dir);
   const hook = path.join(dir, ".agents", "skills", "siftos", "scripts", "hook-codex.mjs");
   const out = JSON.parse(execFileSync(process.execPath, [hook, "before_mutation"], {
@@ -120,7 +117,6 @@ withRepo((dir) => {
   assert(String(out.hookSpecificOutput?.permissionDecisionReason ?? "").includes("configuration error"), "config parity: malformed config denial is explicit");
 });
 
-// M3/M5: classifier is intentionally narrower and shell effects are explicit.
 withRepo((dir) => {
   let state = startTurn(dir, { turnId: "t1", prompt: "Create an implementation plan" });
   assertEq(classifyLevel(state, "Write", { file_path: "docs/implementation-plan.md" }), "L0", "classifier: implementation plan docs are not L3");
@@ -132,7 +128,6 @@ withRepo((dir) => {
   assertEq(classifyToolEffect("Bash", { command: "npm test" }), "verification", "shell: npm test is verification");
 });
 
-// M1: after-hook ignores reads and idle closeout is not inert without active_bet.
 withRepo((dir) => {
   run(["hooks", "set", "advisory"], dir);
   recordMutation(dir, { toolName: "Read", toolInput: { file_path: "src/a.ts" } });
@@ -143,7 +138,6 @@ withRepo((dir) => {
   assert(result.message.includes("no unique active building Bet"), "OpenCode-style idle closeout reports unattached mutations");
 });
 
-// M4/B2: manual/automatic gate result parity + balanced one-continuation semantics.
 withRepo((dir) => {
   run(["hooks", "set", "balanced"], dir);
   writeFileSync(path.join(dir, ".product", "decisions", "DEC-0007-referral.md"), decisionMarkdown("building"));
@@ -152,6 +146,7 @@ withRepo((dir) => {
   const automatic = deterministicShipGate(dir, decision);
   const manual = run(["ship", "DEC-0007"], dir);
   assert(manual.stdout.includes(`SHIP GATE: ${automatic.result}`), "ship gate: CLI and standalone runtime agree on result");
+  assertEq(automatic.result, "PASS_WITH_WARNINGS", "ship gate fixture: warnings exercise closeout continuation");
   const state = loadRuntime(dir); state.active_bet = "DEC-0007"; state.mutation.started = true; saveRuntime(dir, state);
   const first = closeout(dir);
   assertEq(first.continue, true, "balanced closeout: first warning requests one continuation");
@@ -159,7 +154,6 @@ withRepo((dir) => {
   assertEq(second.continue, false, "balanced closeout: continuation is capped at one");
 });
 
-// B6: a new OpenCode session id resets prior guard authorization.
 withRepo((dir) => {
   const old = loadRuntime(dir); old.guard = { intent_id: "old", status: "bypassed", level: "L2", resolution: "build_anyway", block_issued: true }; old.turn_id = "old"; saveRuntime(dir, old);
   const fresh = startSession(dir, "session-new");
