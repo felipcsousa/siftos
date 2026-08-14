@@ -74,7 +74,7 @@ export function loadRuntime(root: string): RuntimeState {
       mutation?: { files?: string[]; started?: boolean };
     };
     const base = defaultRuntime();
-    const rawGuard = parsed.guard ?? {};
+    const rawGuard: Partial<RuntimeGuardState> = parsed.guard ?? {};
     const guard: RuntimeGuardState = { ...base.guard, ...rawGuard };
 
     // Legacy runtime did not scope resolutions to an intent. Never promote a
