@@ -1,8 +1,6 @@
 // OpenCode adapter for the documented plugin lifecycle.
-// OpenCode currently provides native before/after tool hooks, session events,
-// and compaction context injection. It does not expose documented 1:1
-// equivalents for Codex UserPromptSubmit or Stop continuation, so those
-// capabilities degrade explicitly instead of being advertised as parity.
+// Native coverage: before/after tool execution, session events and compaction.
+// Prompt-submit/forced Stop parity with Codex remains explicitly degraded.
 import {
   beforeMutation,
   buildCapsule,
@@ -14,16 +12,23 @@ import {
   observe,
   productRoot,
   recordMutation,
+  startSession,
 } from "../scripts/hook-lib.mjs";
 
 async function log(client, level, message) {
   try {
-    await client?.app?.log?.({
-      body: { service: "siftos", level, message },
-    });
+    await client?.app?.log?.({ body: { service: "siftos", level, message } });
   } catch {
-    // Logging is advisory; never fail a coding session because the log API changed.
+    // Logging is advisory; never fail a coding session because logging changed.
   }
+}
+
+function eventSessionId(event) {
+  return event?.properties?.info?.id
+    ?? event?.properties?.sessionID
+    ?? event?.sessionID
+    ?? event?.id
+    ?? `opencode-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export const SiftOSPlugin = async ({ client, directory }) => {
@@ -34,12 +39,9 @@ export const SiftOSPlugin = async ({ client, directory }) => {
     "tool.execute.before": async (input, output) => {
       const state = loadRuntime(root);
       if (!state.turn_id) {
-        // OpenCode does not currently expose a documented UserPromptSubmit
-        // hook. Scope authorization to the current session/idle cycle rather
-        // than pretending prompt parity exists.
         state.turn_id = `opencode-${state.session_id}`;
         state.guard.intent_id = state.turn_id;
-        state.guard.status = state.guard.status === "idle" ? "unresolved" : state.guard.status;
+        if (state.guard.status === "idle") state.guard.status = "unresolved";
         observe(root, state, "before_mutation");
       }
       const result = beforeMutation(root, {
@@ -51,7 +53,10 @@ export const SiftOSPlugin = async ({ client, directory }) => {
     },
 
     "tool.execute.after": async (input, output) => {
-      recordMutation(root, { toolInput: input?.args ?? output?.args ?? {} });
+      recordMutation(root, {
+        toolName: input?.tool ?? input?.toolName ?? "",
+        toolInput: input?.args ?? output?.args ?? {},
+      });
     },
 
     "experimental.session.compacting": async (_input, output) => {
@@ -65,18 +70,19 @@ export const SiftOSPlugin = async ({ client, directory }) => {
     event: async ({ event }) => {
       const state = loadRuntime(root);
       switch (event?.type) {
-        case "session.created":
-          if (effectiveHook(root, "session_start", state).enabled) {
-            observe(root, state, "session_start");
-            await log(client, "info", "SiftOS session context is available through the repository skill; OpenCode has no documented SessionStart context-return contract equivalent to Codex.");
+        case "session.created": {
+          const fresh = startSession(root, eventSessionId(event));
+          if (effectiveHook(root, "session_start", fresh).enabled) {
+            await log(client, "info", "SiftOS session started. Product context remains repository-native; OpenCode lifecycle coverage differs from Codex and is reported as such by siftos doctor.");
           }
           break;
+        }
 
         case "session.idle": {
           if (!effectiveHook(root, "turn_stop", state).enabled) break;
           const result = closeout(root);
           if (result.message) {
-            await log(client, result.continue ? "warn" : "info", `${result.message} OpenCode has no documented Stop-style continuation contract, so this closeout is advisory.`);
+            await log(client, result.continue ? "warn" : "info", `${result.message} OpenCode idle closeout is advisory; this adapter does not claim Codex-style forced Stop continuation.`);
           }
           clearTurn(root);
           break;
