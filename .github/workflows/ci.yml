@@ -19,3 +19,4 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: node evals/run.mjs
+      - run: node evals/hooks/run.mjs
