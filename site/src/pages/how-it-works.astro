@@ -1,0 +1,503 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Masthead from '../components/Masthead.astro';
+import CopySlip from '../components/CopySlip.astro';
+
+const terminal = 'npx siftos install';
+const repo = 'https://github.com/felipcsousa/siftos';
+const quickstart = `${repo}/blob/main/docs/quickstart.md`;
+const dec0001 = `${repo}/blob/main/.product/decisions/DEC-0001-deterministic-core-first.md`;
+---
+
+<Layout
+  title="How SiftOS works — the decision protocol"
+  description="Four phases, twelve commands, one ledger. Start with context, decide consciously, ship through the gate, and keep the record healthy."
+>
+  <Masthead current="how-it-works" />
+
+  <div class="folio">
+    <span>The ledger of record for product decisions</span>
+    <span class="tabular">Folio 2026 · How it works</span>
+  </div>
+
+  <!-- ============ 1. Core loop ============ -->
+  <section class="hero" aria-label="How SiftOS works">
+    <div class="hero-copy">
+      <h1>How SiftOS works.</h1>
+      <p class="lead">
+        Four phases, twelve commands, one ledger. Every product decision becomes a dated
+        entry with a prediction and a metric — and the outcome posts later, next to the
+        prediction that made it.
+      </p>
+    </div>
+
+    <div class="loop" style="margin-top: 2.5rem">
+      <div class="loop-step">
+        <span class="num">01 · Decision</span>
+        <h3>Shape it consciously</h3>
+        <p>What are we deciding, what are the options, and who owns the call?</p>
+      </div>
+      <div class="loop-step">
+        <span class="num">02 · Prediction</span>
+        <h3>Name the metric</h3>
+        <p>Write the expected outcome and the metric that will judge it — before building.</p>
+      </div>
+      <div class="loop-step">
+        <span class="num">03 · Outcome</span>
+        <h3>Post the result</h3>
+        <p>When results land, the outcome posts with the measured delta — next to the prediction.</p>
+      </div>
+      <div class="loop-step">
+        <span class="num">04 · Learning</span>
+        <h3>Close the loop</h3>
+        <p>What did we get right, and what changes in how this team decides?</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. Four phases ============ -->
+  <div class="how-layout">
+    <nav class="how-toc" aria-label="Phases">
+      <span class="how-toc-title">Phases</span>
+      <a href="#start">01 · Start</a>
+      <a href="#decide">02 · Decide</a>
+      <a href="#ship">03 · Ship</a>
+      <a href="#maintain">04 · Maintain</a>
+    </nav>
+
+    <div class="how-body">
+      <!-- ============ Phase 1 — Start ============ -->
+      <section class="phase" id="start" aria-labelledby="start-h">
+        <div class="phase-head">
+          <span class="phase-num tabular">01</span>
+          <div>
+            <h2 id="start-h">Start — build context</h2>
+            <p class="lead" style="margin: 0.75rem 0 0">
+              SiftOS begins with the memory: what this product is, who it serves, and how
+              it will know it is working.
+            </p>
+          </div>
+        </div>
+
+        <div class="phase-commands" aria-label="Commands">
+          <code>siftos init</code>
+          <code>siftos shape</code>
+        </div>
+
+        <p>
+          <code>init</code> builds persistent product context progressively —
+          <code>PRODUCT.md</code>, <code>STRATEGY.md</code>, <code>METRICS.md</code>,
+          <code>PRINCIPLES.md</code>, <code>ROADMAP.md</code>. It never ships placeholders
+          as truth: <code>siftos doctor</code> reports memory that is still empty.
+        </p>
+        <p>
+          <code>shape</code> turns an idea into a Bet — problem, target user, hypothesis,
+          success threshold (SVT), scope, non-goals, and measurement — before any code.
+        </p>
+
+        <div class="pdr-file" style="margin-top: 2rem">
+          <div class="pdr-file-head">
+            <span>what init scaffolds into your repo</span>
+            <span class="tabular">.product/</span>
+          </div>
+          <pre><code>.product/
+├── PRODUCT.md
+├── STRATEGY.md
+├── METRICS.md
+├── PRINCIPLES.md
+├── ROADMAP.md
+├── config.json
+├── decisions/
+├── evidence/
+├── .runtime/     (disposable, gitignored)
+└── .index/       (derived, gitignored)</code></pre>
+        </div>
+      </section>
+
+      <!-- ============ Phase 2 — Decide ============ -->
+      <section class="phase" id="decide" aria-labelledby="decide-h">
+        <div class="phase-head">
+          <span class="phase-num tabular">02</span>
+          <div>
+            <h2 id="decide-h">Decide — on the record</h2>
+            <p class="lead" style="margin: 0.75rem 0 0">
+              A decision becomes a Product Decision Record: facts, evidence, assumptions,
+              alternatives, dissent, and a prediction — all in one versioned file.
+            </p>
+          </div>
+        </div>
+
+        <div class="phase-commands" aria-label="Commands">
+          <code>siftos decide</code>
+          <code>siftos validate</code>
+          <code>siftos challenge</code>
+        </div>
+
+        <p>
+          <code>decide</code> structures the record — facts, evidence, assumptions,
+          alternatives, recommendation, dissent, prediction. <code>validate</code> defines
+          a Validation Contract before results exist. <code>challenge</code> runs an
+          adversarial review that never modifies the record itself.
+        </p>
+
+        <div class="pdr-file" style="margin-top: 2rem">
+          <div class="pdr-file-head">
+            <span>a real record from this repository</span>
+            <span class="tabular">DEC-0001 · 2026-08-13</span>
+          </div>
+          <pre><code>---
+<span class="md-key">id</span>: DEC-0001
+<span class="md-key">title</span>: Ship deterministic CLI before agent workflows
+<span class="md-key">status</span>: accepted
+<span class="md-key">confidence</span>: medium
+<span class="md-key">reversibility</span>: high
+<span class="md-key">review_date</span>: 2026-09-13
+---
+
+<span class="md-h2">## Facts</span>
+- The deterministic core has 112 passing unit tests.
+- The eval suite runs deterministic workflows against five fixtures.
+
+<span class="md-h2">## Options Considered</span>
+- A. Ship agent workflows first (rejected)
+- C. Ship both at once (rejected)
+
+<span class="md-h2">## Primary Metric</span>
+Number of sample decisions that parse, validate, and appear in audit.
+
+<span class="md-h2">## Guardrails</span>
+If a sample PDR fails validation, stop and fix the core before adding more.</code></pre>
+        </div>
+        <p class="meta" style="margin-top: 0.75rem">
+          <a href={dec0001}>Read the full record</a> — rejected alternatives stay on it,
+          struck through, never erased.
+        </p>
+      </section>
+
+      <!-- ============ Phase 3 — Ship ============ -->
+      <section class="phase" id="ship" aria-labelledby="ship-h">
+        <div class="phase-head">
+          <span class="phase-num tabular">03</span>
+          <div>
+            <h2 id="ship-h">Ship — through the gate</h2>
+            <p class="lead" style="margin: 0.75rem 0 0">
+              A Bet ships only through a deterministic gate — never because the agent
+              decided it felt right.
+            </p>
+          </div>
+        </div>
+
+        <div class="phase-commands" aria-label="Commands">
+          <code>siftos prioritize</code>
+          <code>siftos ship</code>
+          <code>siftos review</code>
+        </div>
+
+        <p>
+          <code>prioritize</code> compares Bets by strategy, constraint, evidence, cost,
+          reversibility, and learning value. <code>ship</code> runs the deterministic Ship
+          Gate on an accepted Bet. <code>review</code> compares the prediction with the
+          outcome and extracts the learning — closing the loop.
+        </p>
+
+        <div class="gate" style="margin-top: 2rem" aria-label="Ship Gate checks">
+          <div class="pdr-file-head">
+            <span>Ship Gate — deterministic checks</span>
+            <span class="tabular">exit 0 · pass</span>
+          </div>
+          <div class="gate-body">
+            <div class="gate-row">
+              <span class="gate-mark" aria-hidden="true"></span>
+              <span>Record has an id, a lifecycle, and a metric</span>
+            </div>
+            <div class="gate-row">
+              <span class="gate-mark" aria-hidden="true"></span>
+              <span>Prediction is written before the outcome</span>
+            </div>
+            <div class="gate-row">
+              <span class="gate-mark" aria-hidden="true"></span>
+              <span>Rejected alternatives stay on the record</span>
+            </div>
+            <div class="gate-row">
+              <span class="gate-mark" aria-hidden="true"></span>
+              <span>Guardrails checked — validation exits clean</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Phase 4 — Maintain ============ -->
+      <section class="phase" id="maintain" aria-labelledby="maintain-h">
+        <div class="phase-head">
+          <span class="phase-num tabular">04</span>
+          <div>
+            <h2 id="maintain-h">Maintain — keep the ledger healthy</h2>
+            <p class="lead" style="margin: 0.75rem 0 0">
+              The record is only as good as the habit. SiftOS audits, retrieves, and
+              automates — always at your explicit choice.
+            </p>
+          </div>
+        </div>
+
+        <div class="phase-commands" aria-label="Commands">
+          <code>siftos diagnose</code>
+          <code>siftos audit</code>
+          <code>siftos show</code>
+          <code>siftos hooks</code>
+        </div>
+
+        <p>
+          <code>diagnose</code> finds the highest-leverage product health issues.
+          <code>audit</code> scores Decision Health with deterministic linter findings.
+          <code>show</code> retrieves decision history. <code>hooks</code> inspects and
+          changes lifecycle automation — and automation is never on by default.
+        </p>
+
+        <div class="adapters" style="margin-top: 2rem">
+          <div class="pdr-file-head">
+            <span>lifecycle adapters — your choice</span>
+            <span class="tabular">hooks set</span>
+          </div>
+          <div class="adapter-row">
+            <span class="adapter-name">advisory</span>
+            <p>Suggests, never blocks. The agent reports; the human decides.</p>
+          </div>
+          <div class="adapter-row">
+            <span class="adapter-name">balanced</span>
+            <p>Guards the record: structure and lifecycle checks before mutation.</p>
+          </div>
+          <div class="adapter-row">
+            <span class="adapter-name">strict</span>
+            <p>Blocks mutations that violate the protocol. Opt-in, always explicit.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ 3. CTA ============ -->
+  <section aria-labelledby="start-cta">
+    <h2 id="start-cta">Start your first decision in 10 minutes.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      No account, no database, no vendor. Copy, paste, and the record lives in your repo.
+    </p>
+
+    <div style="max-width: 640px; margin-top: 2.5rem">
+      <CopySlip
+        command={terminal}
+        label="Install in your terminal"
+        note="Runs anywhere Node 18+ is installed. MIT licensed, no telemetry."
+      />
+    </div>
+    <p class="meta" style="margin-top: 1.25rem">
+      Then <code>siftos init</code>, and ask your agent to start your first record. The
+      <a href={quickstart}>quickstart</a> walks the whole thing through.
+    </p>
+  </section>
+
+  <hr class="double-rule" aria-hidden="true" />
+  <footer>
+    <div class="masthead masthead--footer">
+      <svg class="masthead-mark" width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" fill="none" stroke="#7f8698" stroke-width="1.5" />
+        <rect x="3" y="3" width="26" height="26" fill="none" stroke="#a9afbd" stroke-width="1" />
+        <rect x="12" y="14" width="8" height="4" fill="#9e2f22" />
+      </svg>
+      <span class="masthead-name">SiftOS</span>
+    </div>
+    <div class="footer-links">
+      <a href="/siftos/">Home</a>
+      <a href="/siftos/how-it-works/">How it works</a>
+      <a href={`${repo}/blob/main/README.md`}>README</a>
+      <a href={quickstart}>Quickstart</a>
+      <a href={repo}>GitHub</a>
+      <a href={`${repo}/blob/main/LICENSE`}>MIT License</a>
+    </div>
+    <div class="folio">
+      <span>The ledger of record for product decisions</span>
+      <span class="tabular">Folio 2026 · <a href={`${repo}/issues/new/choose`}>Open an issue</a></span>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  .hero {
+    padding-top: clamp(2.5rem, 6vw, 4.5rem);
+  }
+
+  .hero .lead {
+    margin: 0;
+  }
+
+  .how-layout {
+    display: grid;
+    grid-template-columns: 13rem 1fr;
+    gap: 3rem;
+    padding: clamp(3.5rem, 9vw, 6.5rem) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .how-toc {
+    position: sticky;
+    top: 2rem;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    border-left: 1px solid var(--rule);
+    padding-left: 1rem;
+  }
+
+  .how-toc-title {
+    color: var(--ink-faint);
+    margin-bottom: 0.4rem;
+  }
+
+  .how-toc a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 0.2rem 0;
+  }
+
+  .how-toc a:hover {
+    color: var(--accent-deep);
+  }
+
+  .how-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .how-toc {
+    min-width: 0;
+  }
+
+  .phase {
+    padding: 0 0 clamp(3.5rem, 8vw, 5.5rem);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .phase:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .phase-head {
+    display: flex;
+    gap: 1.25rem;
+    align-items: baseline;
+  }
+
+  .phase-num {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.1em;
+    color: var(--ink-faint);
+    flex: none;
+  }
+
+  .phase h2 {
+    margin: 0;
+  }
+
+  .phase-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.5rem 0 1rem;
+  }
+
+  .phase-commands code {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--accent-deep);
+    background: var(--paper-deep);
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--r);
+  }
+
+  .gate,
+  .adapters {
+    border: 1px solid var(--rule);
+    background: var(--paper-raise);
+    box-shadow: 0 1px 0 var(--rule);
+  }
+
+  .gate-body {
+    padding: 0.75rem 1.1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .gate-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    font-size: 0.9375rem;
+    color: var(--ink-soft);
+  }
+
+  .gate-mark {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid var(--accent-deep);
+    border-radius: 1px;
+    background: var(--accent-deep);
+    align-self: center;
+  }
+
+  .adapter-row {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .adapter-name {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--accent-deep);
+  }
+
+  .adapter-row p {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 860px) {
+    .how-layout {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .how-toc {
+      position: static;
+      flex-direction: row;
+      flex-wrap: wrap;
+      border-left: 0;
+      border-bottom: 1px solid var(--rule);
+      padding: 0 0 1rem;
+      gap: 0.5rem 1.25rem;
+    }
+
+    .how-toc-title {
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    .adapter-row {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+  }
+</style>

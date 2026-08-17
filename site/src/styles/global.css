@@ -140,6 +140,40 @@ a:hover {
   color: var(--ink-faint);
 }
 
+.masthead-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-left: auto;
+}
+
+.site-nav-link {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 0.25rem 0;
+}
+
+.site-nav-link:hover {
+  color: var(--accent-deep);
+}
+
+.site-nav-link--current {
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
 .masthead--footer {
   gap: 0.6rem;
   margin-bottom: 1rem;

@@ -77,23 +77,6 @@ const { title, description } = Astro.props;
         });
       });
 
-      // The hero entry posts its outcome when the PDR file scrolls into view.
-      const heroEntry = document.getElementById('hero-entry');
-      const exampleFile = document.getElementById('example-file');
-      if (heroEntry && exampleFile && 'IntersectionObserver' in window) {
-        const io = new IntersectionObserver(
-          (entries) => {
-            for (const e of entries) {
-              if (e.isIntersecting) {
-                heroEntry.dataset.measured = 'true';
-                io.disconnect();
-              }
-            }
-          },
-          { threshold: 0.35 }
-        );
-        io.observe(exampleFile);
-      }
     </script>
   </body>
 </html>

@@ -123,7 +123,7 @@ Warm ivory paper carrying near-black ink, blue-gray ruled hairlines, and a singl
 
 ## Layout
 
-Single column, max 1080px, 1.5rem gutters. Sections stack as folio entries, each closed by a 1px rule; vertical rhythm is `clamp(3.5rem, 9vw, 6.5rem)` between sections, with more space above a heading than below it. Three-column entry grids and the four-column loop collapse to 1fr at 860px; slip and contrib grids collapse at 620px. The hero is folio header → headline → balance line → live entry → posting slips, in that order.
+Single column, max 1080px, 1.5rem gutters. Two pages: the landing (Persuade) and How it works (Read), sharing the masthead, folio furniture, footer, and the ledger grammar. The How-it-works page uses a two-column layout — a sticky folio index (13rem) beside the phase sections — collapsing to a single column and a wrapping index below 860px. Sections stack as folio entries, each closed by a 1px rule; vertical rhythm is `clamp(3.5rem, 9vw, 6.5rem)` between sections, with more space above a heading than below it. Three-column entry grids and the four-column loop collapse to 1fr at 860px; slip and contrib grids collapse at 620px. The hero is folio header → headline → balance line → live entry → posting slips, in that order.
 
 ## Elevation & Depth
 
@@ -134,6 +134,10 @@ Flat paper. There are no ambient shadows, no blur, no elevation steps: depth is 
 Print corners: radius 2px everywhere (`--r`). No pills, no 12–16px card radii — the world is a printed form, and sharp corners are its native grammar. Borders are 1px hairlines; the active stamp doubles its border with an inset ring; the ghost entry uses a dashed rule and a struck line.
 
 ## Components
+
+### Masthead / Site Nav
+- **Character:** the ledger's letterhead — mark + wordmark + tagline, with a mono uppercase site nav (Home · How it works · GitHub)
+- **Shape:** mark in a double-ruled frame with a vermilion stamp; wordmark in Spectral 600 1.5rem; nav links in Fragment Mono with a hairline underline on the current page; the brand lockup links home
 
 ### Copy Button
 - **Shape:** 2px radius, mono uppercase 0.75rem, +0.1em tracking
