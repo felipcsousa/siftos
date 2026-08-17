@@ -11,6 +11,7 @@ function lint(d) {
   const now = today();
   const out = [];
   const warn = (rule, msg) => out.push(["WARNING", rule, msg]);
+  const info = (rule, msg) => out.push(["INFO", rule, msg]);
   const err = (rule, msg) => out.push(["ERROR", rule, msg]);
   if (!d.goal || /^unknown\.?$/i.test(d.goal.trim())) {
     warn("missing-goal", "No goal associated.");
@@ -48,7 +49,7 @@ function lint(d) {
     if (age > 365) {
       warn("stale-evidence", `Evidence dated ${date} is potentially stale (>365 days old): "${item.slice(0, 100)}".`);
     } else if (age > 90) {
-      warn("stale-evidence", `Evidence dated ${date} is potentially stale (90\u2013365 days old): "${item.slice(0, 100)}".`);
+      info("stale-evidence", `Evidence dated ${date} is potentially stale (90\u2013365 days old): "${item.slice(0, 100)}".`);
     }
   }
   const facts = new Set(sectionItems(d, "Facts").map((s) => s.trim()));
@@ -105,6 +106,9 @@ function lint(d) {
   }
   if (d.status === "superseded" && !d.supersededBy) {
     err("conflicting-status", "Status 'superseded' without superseded_by.");
+  }
+  if (d.status === "proposed" && hasContent(sectionItems(d, "Final Human Decision"))) {
+    warn("conflicting-status", "Status is 'proposed' but a final human decision is already recorded.");
   }
   return out;
 }

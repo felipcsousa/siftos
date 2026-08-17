@@ -38,6 +38,7 @@ function main() {
   console.log("");
 
   for (const e of errors) console.error(e);
+  if (errors.length > 0) process.exit(1);
 
 }
 

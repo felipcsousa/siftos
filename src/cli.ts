@@ -59,22 +59,35 @@ const VALUE_FLAGS: Record<string, true> = {
   dir: true, status: true, tag: true, owner: true, goal: true, decision: true,
   "max-related": true, level: true, resolution: true, prompt: true, "turn-id": true,
 };
+const BOOLEAN_FLAGS = new Set([
+  "help", "json", "pending-review", "session", "write",
+]);
+const KNOWN_FLAGS = new Set([...Object.keys(VALUE_FLAGS), ...BOOLEAN_FLAGS]);
 
 export function parseArgs(argv: string[]): Args {
   const positionals: string[] = [];
   const flags: Record<string, string | boolean> = {};
+  let positionalOnly = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i] ?? "";
-    if (!arg.startsWith("--")) {
+    if (positionalOnly || !arg.startsWith("--")) {
       positionals.push(arg);
+      continue;
+    }
+    if (arg === "--") {
+      // Everything after `--` is positional (e.g. a path that starts with -).
+      positionalOnly = true;
       continue;
     }
     const eq = arg.indexOf("=");
     if (eq !== -1) {
-      flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+      const name = arg.slice(2, eq);
+      if (!KNOWN_FLAGS.has(name)) console.warn("warning: unknown flag --" + name);
+      flags[name] = arg.slice(eq + 1);
       continue;
     }
     const name = arg.slice(2);
+    if (!KNOWN_FLAGS.has(name)) console.warn("warning: unknown flag --" + name);
     const next = argv[i + 1];
     if (VALUE_FLAGS[name] && next !== undefined && !next.startsWith("--")) {
       flags[name] = next;

@@ -51,7 +51,7 @@ export function shipGate(
   const expectedText = section(decision, "Expected Outcome").join(" ");
   if (!/\d/.test(expectedText)) warn("missing-success-threshold", "Success threshold is not quantified.");
 
-  const hasBaseline = /baseline:\s*(?!unknown\b)[^\n]*\S/i.test(ctx.metrics);
+  const hasBaseline = /baseline:\s*(?:-\s*)?(?!unknown\b)[^\n]*\S/i.test(ctx.metrics);
   if (!hasBaseline && !/\d/.test(expectedText)) warn("missing-baseline", "No baseline — relative success cannot be evaluated.");
 
   if (!/\b(instrument|analytics|event|track)\b/i.test(bodyText(decision))) {

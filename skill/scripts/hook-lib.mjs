@@ -68,7 +68,10 @@ export function loadRuntime(root) {
       ship_gate: { ...base.ship_gate, ...(raw.ship_gate ?? {}) },
       heartbeat: { ...(raw.heartbeat ?? {}) }, metrics: { ...(raw.metrics ?? {}) },
     };
-  } catch { return defaultRuntime(); }
+  } catch (error) {
+    console.warn("warning: .product/.runtime/session.json is unreadable; resetting to a fresh runtime state");
+    return defaultRuntime();
+  }
 }
 
 export function saveRuntime(root, state) {
@@ -130,7 +133,7 @@ export function effectiveHook(root, name, state = loadRuntime(root)) {
 export function observe(root, state, hookName) { state.heartbeat[hookName] = now(); saveRuntime(root, state); }
 function resolutionFromPrompt(prompt) {
   const text = String(prompt ?? "").toLowerCase();
-  if (/\b(build anyway|just (build|implement)|skip (the )?(product )?(check|guard)|proceed anyway)\b/.test(text)) return "build_anyway";
+  if (/\b(build anyway|skip (the )?(product )?(check|guard)|proceed anyway)\b/.test(text)) return "build_anyway";
   if (/\bprototype\b/.test(text)) return "prototype";
   if (/\b(existing bet|use (the )?bet|attach .*bet)\b/.test(text) || /\bDEC-\d{4}\b/i.test(String(prompt ?? ""))) return "existing_bet";
   if (/\bshape\b/.test(text)) return "shape"; if (/\bvalidate\b/.test(text)) return "validate"; if (/\breconsider\b/.test(text)) return "reconsider";
@@ -263,7 +266,7 @@ export function deterministicShipGate(root, decision) {
   const hasExpected = hasContent(sectionItems(decision, "Expected Outcome")); const hasMetric = hasContent(sectionItems(decision, "Primary Metric"));
   if (!hasExpected && !hasMetric) { error("missing-expected-outcome", "No expected outcome or primary metric recorded."); error("missing-metric", "No primary metric or expected outcome to measure."); } else if (!hasExpected) warn("missing-expected-outcome", "No quantified expected outcome — only a primary metric.");
   const expectedText = sectionItems(decision, "Expected Outcome").join(" "); if (!/\d/.test(expectedText)) warn("missing-success-threshold", "Success threshold is not quantified.");
-  const metrics = readContext(root, "METRICS.md"); const hasBaseline = /baseline:\s*(?!unknown\b)[^\n]*\S/i.test(metrics); if (!hasBaseline && !/\d/.test(expectedText)) warn("missing-baseline", "No baseline — relative success cannot be evaluated.");
+  const metrics = readContext(root, "METRICS.md"); const hasBaseline = /baseline:\s*(?:-\s*)?(?!unknown\b)[^\n]*\S/i.test(metrics); if (!hasBaseline && !/\d/.test(expectedText)) warn("missing-baseline", "No baseline — relative success cannot be evaluated.");
   if (!/\b(instrument|analytics|event|track)\b/i.test(bodyText(decision))) warn("missing-instrumentation", "No instrumentation/measurement plan detected.");
   if (!hasContent(sectionItems(decision, "Guardrails"))) warn("missing-guardrail", "No guardrails defined."); if (!hasContent(sectionItems(decision, "Revisit Condition"))) warn("missing-review-condition", "No revisit condition defined."); if (!hasContent(sectionItems(decision, "Scope"))) warn("missing-scope", "No scope defined — scope drift cannot be checked.");
   if (findings.some((finding) => finding.severity === "ERROR")) return { result: "FAIL", findings }; return { result: findings.length ? "PASS_WITH_WARNINGS" : "PASS", findings };
