@@ -54,7 +54,10 @@ function siftos(repoDir, args) {
 function setupFixture(name) {
   const tmp = mkdtempSync(path.join(os.tmpdir(), `siftos-eval-${name}-`));
   run("git", ["init", "-q"], { cwd: tmp });
-  siftos(tmp, ["init", "--dir", tmp]);
+  const init = siftos(tmp, ["init", "--dir", tmp]);
+  if (init.code !== 0) {
+    throw new Error(`eval fixture "${name}": siftos init failed: ${init.stderr || init.stdout}`);
+  }
   const fixtureDir = path.join(root, "evals", "fixtures", name);
   const decisionsSrc = path.join(fixtureDir, "decisions");
   const decisionsDest = path.join(tmp, ".product", "decisions");

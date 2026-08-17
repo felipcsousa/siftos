@@ -33,7 +33,7 @@ const TRANSITIONS: Record<DecisionStatus, DecisionStatus[]> = {
   accepted: ["shipped", "building", "cancelled", "superseded"],
   building: ["shipped", "paused", "cancelled", "failed", "superseded"],
   shipped: ["reviewed", "measuring", "superseded"],
-  measuring: ["reviewed", "paused", "failed"],
+  measuring: ["reviewed", "paused", "failed", "superseded", "cancelled"],
   reviewed: [],
   rejected: [],
   cancelled: [],

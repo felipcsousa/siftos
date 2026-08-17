@@ -31,6 +31,7 @@ import {
   guardMessage,
   guardVerdict,
   GUARD_RESOLUTIONS,
+  POLICY_OK,
   type GuardLevel,
   type GuardResolution,
 } from "./guard.js";
@@ -176,6 +177,22 @@ async function cmdInstall(flags: Record<string, string | boolean>): Promise<numb
   if (!source) { console.error("error: skill package not found next to this CLI (corrupted install)"); return 1; }
 
   const target = path.join(root, ".agents", "skills", "siftos");
+  if (existsSync(target)) {
+    // Provenance check mirroring the OpenCode plugin guard: never destroy a
+    // directory at this path that SiftOS does not own (user fork, another
+    // tool's skill).
+    let managed = false;
+    try {
+      const marker = readFileSync(path.join(target, "SKILL.md"), "utf8").slice(0, 500);
+      managed = /name:\s*siftos/i.test(marker);
+    } catch {
+      managed = false;
+    }
+    if (!managed) {
+      console.error("error: .agents/skills/siftos already exists and is not managed by SiftOS; refusing to replace it");
+      return 1;
+    }
+  }
   rmSync(target, { recursive: true, force: true });
   mkdirSync(path.dirname(target), { recursive: true });
   cpSync(source, target, { recursive: true });
@@ -499,6 +516,10 @@ async function cmdRoadmap(args: Args): Promise<number> {
 async function cmdGuard(args: Args): Promise<number> {
   const repo = tryOpenRepo(args.flags);
   if (!repo?.initialized) return 1;
+  if (!POLICY_OK) {
+    console.error("error: SiftOS policy data is unreadable/corrupt; refusing to run Product Guard until the skill policy is fixed");
+    return 1;
+  }
   const resolved = effectiveConfig(repo);
   if (!resolved.hooksValid) {
     console.error("error: invalid hooks config; automatic Product Guard is disabled until .product/config.json is fixed");
@@ -516,9 +537,10 @@ async function cmdGuard(args: Args): Promise<number> {
 
   let state = loadRuntime(repo.root);
   const explicitTurn = typeof args.flags["turn-id"] === "string" ? args.flags["turn-id"] : null;
+  // Manual Guard calls are always independent intents unless --turn-id is
+  // explicitly provided; they never join or authorize a live harness turn.
   if (explicitTurn) state = startRuntimeTurn(repo.root, explicitTurn, prompt);
-  else if (!state.turn_id || state.turn_id.startsWith("manual-")) state = startRuntimeTurn(repo.root, `manual-${Date.now()}-${process.pid}`, prompt);
-  if (state.guard.intent_id !== state.turn_id) state = startRuntimeTurn(repo.root, state.turn_id ?? `manual-${Date.now()}`, prompt);
+  else state = startRuntimeTurn(repo.root, `manual-${Date.now()}-${process.pid}`, prompt);
   state.guard.level = level;
 
   const rawResolution = typeof args.flags["resolution"] === "string" ? args.flags["resolution"] : null;

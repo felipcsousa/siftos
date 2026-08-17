@@ -45,9 +45,25 @@ interface SharedPolicy {
   };
 }
 
-const POLICY = JSON.parse(
-  readFileSync(new URL("../skill/scripts/policy.json", import.meta.url), "utf8"),
-) as SharedPolicy;
+let POLICY: SharedPolicy;
+let POLICY_LOAD_FAILED = false;
+try {
+  POLICY = JSON.parse(
+    readFileSync(new URL("../skill/scripts/policy.json", import.meta.url), "utf8"),
+  ) as SharedPolicy;
+} catch {
+  POLICY_LOAD_FAILED = true;
+  POLICY = {
+    build_authorizing_statuses: [],
+    ship_gate_statuses: [],
+    guard: {
+      l3: [], l2: [], l1: [], non_product_paths: [],
+      candidate: { obvious_product: [], technical: [], possible_product: [] },
+    },
+  };
+}
+/** False when the shipped policy data is unreadable/corrupt (fail closed). */
+export const POLICY_OK = !POLICY_LOAD_FAILED;
 
 export const BUILD_AUTHORIZING_STATUSES = new Set(POLICY.build_authorizing_statuses);
 export const SHIP_GATE_STATUSES = new Set(POLICY.ship_gate_statuses);
@@ -89,16 +105,17 @@ const INTERNAL_PATTERNS = [".product/", ".agents/skills/siftos/", ".siftos"];
 function shellEffect(command: string): ToolEffect {
   const cmd = command.trim();
   if (!cmd) return "read";
+  // Compound shell commands may write files — never classify by prefix alone.
+  if (/[>|;&]/.test(cmd)) return "mutation";
+  // Build/package commands may write artifacts.
+  if (/\b(?:npm|pnpm|yarn)\s+(?:install|i|add|run\s+build|build)\b/i.test(cmd)) return "mutation";
+  if (/\b(?:rm|mv|cp|mkdir|touch)\b|\bsed\s+-i\b|\bgit\s+(?:checkout|reset|clean|commit|add|restore)\b/i.test(cmd)) {
+    return "mutation";
+  }
   if (/^(?:npm|pnpm|yarn)\s+(?:test|run\s+(?:test|typecheck))(?:\s|$)/i.test(cmd)) return "verification";
   if (/^(?:pwd|ls|find|cat|head|tail|rg|grep)(?:\s|$)/i.test(cmd)) return "read";
   if (/^git\s+(?:status|diff|log|show)(?:\s|$)/i.test(cmd)) return "read";
   if (/^(?:node|npm|pnpm|yarn)\s+--version(?:\s|$)/i.test(cmd)) return "read";
-  // Build/package commands and compound shell commands may write files.
-  if (/\b(?:npm|pnpm|yarn)\s+(?:install|i|add|run\s+build|build)\b/i.test(cmd)) return "mutation";
-  if (/[>|;&]/.test(cmd)) return "mutation";
-  if (/\b(?:rm|mv|cp|mkdir|touch)\b|\bsed\s+-i\b|\bgit\s+(?:checkout|reset|clean|commit|add|restore)\b/i.test(cmd)) {
-    return "mutation";
-  }
   return "unknown";
 }
 
@@ -162,6 +179,9 @@ export function guardVerdict(level: GuardLevel, enforcement: HookEnforcement): G
       if (level === "L0") return "ALLOW";
       if (level === "L1") return "ADVISE";
       return "REQUIRE_RESOLUTION";
+    default:
+      // Missing/unknown enforcement never blocks (advisory semantics).
+      return "ALLOW";
   }
 }
 

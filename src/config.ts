@@ -104,7 +104,10 @@ export function presetEnforcement(
   if (preset === "off") return hook(false);
   switch (name) {
     case "before_mutation":
-      return hook(true, preset, preset === "strict" ? "fail_closed" : "fail_open");
+      // Fail closed under balanced and strict: a runtime error in the guard
+      // must deny, never silently allow (README: before_mutation fails closed
+      // until the policy is unambiguous).
+      return hook(true, preset, preset === "advisory" ? "fail_open" : "fail_closed");
     case "turn_stop":
       return hook(true, preset, "fail_open");
     case "prompt_submit":

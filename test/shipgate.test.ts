@@ -12,6 +12,18 @@ describe("shipGate (PRD V2 §74–§76)", () => {
     );
   });
 
+  it("NOT_REQUIRED for terminal/history states (reviewed, superseded)", () => {
+    // README: "reviewed and superseded are historical/terminal states and
+    // return NOT_REQUIRED" — a policy.json change adding them to
+    // ship_gate_statuses must not pass silently.
+    expect(shipGate(makeDecision({ status: "reviewed" }), { metrics: "" }).result).toBe(
+      "NOT_REQUIRED",
+    );
+    expect(shipGate(makeDecision({ status: "superseded" }), { metrics: "" }).result).toBe(
+      "NOT_REQUIRED",
+    );
+  });
+
   it("PASS for a fully measured bet", () => {
     const d = withSections(cleanDecision(), {
       Goal: ["Increase activation without reducing trial quality."],
