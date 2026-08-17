@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Masthead from '../components/Masthead.astro';
 import CopySlip from '../components/CopySlip.astro';
 import LedgerEntry from '../components/LedgerEntry.astro';
 
@@ -26,21 +27,11 @@ const issues = `${repo}/issues/new/choose`;
 
   <!-- ============ 1. Hero — folio header ============ -->
   <section class="hero" aria-label="SiftOS">
-    <div class="masthead">
-      <svg class="masthead-mark" width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
-        <rect width="32" height="32" fill="none" stroke="#7f8698" stroke-width="1.5" />
-        <rect x="3" y="3" width="26" height="26" fill="none" stroke="#a9afbd" stroke-width="1" />
-        <rect x="12" y="14" width="8" height="4" fill="#9e2f22" />
-      </svg>
-      <div class="masthead-text">
-        <span class="masthead-name">SiftOS</span>
-        <span class="masthead-tag">Product Decision Intelligence</span>
-      </div>
-    </div>
+    <Masthead current="home" />
 
     <div class="folio">
       <span>The ledger of record for product decisions</span>
-      <span class="tabular">Folio 2026 · Sample</span>
+      <span class="tabular">Folio 2026</span>
     </div>
     <div class="hero-copy">
       <h1>Build knowing what to measure.</h1>
@@ -54,11 +45,6 @@ const issues = `${repo}/issues/new/choose`;
       </p>
     </div>
 
-    <div class="balance" aria-label="Sample balance">
-      <span><strong class="tabular">23</strong> decisions measured</span>
-      <span><strong class="tabular">18</strong> correct predictions</span>
-      <span><strong class="tabular accent-fig">+12</strong> net decisions</span>
-    </div>
 
     <div class="slips" style="margin-top: 2.5rem">
       <CopySlip
@@ -86,7 +72,7 @@ const issues = `${repo}/issues/new/choose`;
       <div class="proof-col">
         <span class="proof-tag">Before · inferred silently</span>
         <div class="ghost" aria-label="Silent inference example">
-          <span class="tabular">DEC-0000</span> &middot; Remove mandatory credit card from trial
+          Ship deterministic CLI before agent workflows
           &mdash; no metric &middot; no reasoning &middot; no record
         </div>
         <p class="meta" style="margin: 0">
@@ -102,17 +88,15 @@ const issues = `${repo}/issues/new/choose`;
       <div class="proof-col">
         <span class="proof-tag proof-tag--after">After · with SiftOS</span>
         <LedgerEntry
-          entryId="hero-entry"
-          id="DEC-0042"
-          date="2026-04-12"
-          title="Remove mandatory credit card from trial"
-          prediction="Activation +4.2pt within 60 days"
-          metric="Trial → paid activation rate"
-          outcome="Awaiting outcome"
-          outcomeMeasured="+2.8pt · 60 days"
+          id="DEC-0001"
+          date="2026-08-13"
+          title="Ship deterministic CLI before agent workflows"
+          prediction="Local install healthy; sample decisions validate"
+          metric="Number of sample decisions that parse, validate, appear in audit"
+          outcome="Awaiting outcome · review 2026-09-13"
           status="decided"
           active={true}
-          annotation="we chose what to measure before building"
+          annotation="the metric was named before the build"
         />
       </div>
     </div>
@@ -241,47 +225,56 @@ const issues = `${repo}/issues/new/choose`;
   <section aria-labelledby="example">
     <h2 id="example">A decision, kept on the record.</h2>
     <p class="lead" style="margin-top: 1rem">
-      A Product Decision Record (PDR) is a versioned, human-readable file — this one is
-      illustrative, but the format is the product.
+      A Product Decision Record (PDR) is a versioned, human-readable file. This one is
+      real — the first decision recorded in this repository.
     </p>
 
     <div class="pdr-file" id="example-file" style="margin-top: 2.5rem">
       <div class="pdr-file-head">
-        <span>decisions/DEC-0042.md</span>
-        <span class="tabular">2026-06-11</span>
+        <span>decisions/DEC-0001-deterministic-core-first.md</span>
+        <span class="tabular">2026-08-13</span>
       </div>
       <pre><code>---
-<span class="md-key">id</span>: DEC-0042
-<span class="md-key">title</span>: Remove mandatory credit card from trial
-<span class="md-key">status</span>: measured
-<span class="md-key">created_at</span>: 2026-04-12
-<span class="md-key">measured_at</span>: 2026-06-11
+<span class="md-key">id</span>: DEC-0001
+<span class="md-key">title</span>: Ship deterministic CLI before agent workflows
+<span class="md-key">status</span>: accepted
+<span class="md-key">created_at</span>: 2026-08-13
+<span class="md-key">owner</span>: siftos-team
+<span class="md-key">confidence</span>: medium
+<span class="md-key">reversibility</span>: high
+<span class="md-key">review_date</span>: 2026-09-13
 ---
 
 <span class="md-h2">## Decision</span>
-Remove the mandatory credit card from the trial flow.
+Ship the deterministic CLI first, agent workflows after.
 
-<span class="md-h2">## Prediction</span>
-Activation rate +4.2pt within 60 days of shipping.
+<span class="md-h2">## Facts</span>
+- The deterministic core has 112 passing unit tests.
+- The eval suite runs deterministic workflows against five fixtures.
 
-<span class="md-h2">## Metric</span>
-Trial → paid activation rate.
+<span class="md-h2">## Options Considered</span>
+- A. Ship agent workflows first (rejected)
+- C. Ship both at once (rejected)
 
-<span class="md-h2">## Alternatives</span>
-- Keep the card requirement (rejected)
-- Require a card on annual plans only (rejected)
+<span class="md-h2">## Primary Metric</span>
+Number of sample decisions that parse, validate, and appear in audit.
+
+<span class="md-h2">## Expected Outcome</span>
+Local install is healthy, sample decisions validate, and the audit report
+reflects real content.
+
+<span class="md-h2">## Guardrails</span>
+If a sample PDR fails validation, stop and fix the core before adding more.
 
 <span class="md-h2">## Outcome</span>
-+2.8pt at 60 days. Prediction overestimated by 1.4pt.
-
-<span class="md-h2">## Learning</span>
-The friction was smaller than modeled — revisit the checkout next quarter.</code></pre>
+Observed result: unknown. Review: 2026-09-13.</code></pre>
     </div>
 
     <p style="margin-top: 1.5rem">
-      Rejected alternatives stay on the record too — struck through, never erased. The
-      full walkthrough is in the <a href={`${repo}/blob/main/docs/quickstart.md`}>quickstart</a>:
-      first bet in ten minutes.
+      Rejected alternatives stay on the record too — struck through, never erased. Read
+      the <a href={`${repo}/blob/main/.product/decisions/DEC-0001-deterministic-core-first.md`}>full record</a>,
+      or the <a href={`${repo}/blob/main/docs/quickstart.md`}>quickstart</a> for the
+      ten-minute walkthrough.
     </p>
   </section>
 
@@ -432,6 +425,8 @@ The friction was smaller than modeled — revisit the checkout next quarter.</co
       <span class="masthead-name">SiftOS</span>
     </div>
     <div class="footer-links">
+      <a href="/siftos/">Home</a>
+      <a href="/siftos/how-it-works/">How it works</a>
       <a href={`${repo}/blob/main/README.md`}>README</a>
       <a href={`${repo}/blob/main/docs/quickstart.md`}>Quickstart</a>
       <a href={repo}>GitHub</a>
