@@ -2,44 +2,58 @@
 
 ## Name
 
-Unknown.
+SiftOS
 
 ## Description
 
-Unknown.
+Product Decision Intelligence for AI-native teams. A repository-native agent skill for OpenCode and Codex, plus a deterministic CLI, that gives agents persistent product context and a structured decision protocol — shape, decide, validate, challenge, build, review and learn. Product memory lives in the repository (`.product/`), not with the AI vendor.
 
 ## Primary customer
 
-Unknown.
+Product managers and heads of product at AI-native teams already using coding agents (Codex, OpenCode). They decide to adopt; the installation is executed by an engineer via copy-paste (`npx siftos install` or an agent prompt). [Confirmed in design session 2026-08-17]
 
 ## Primary jobs to be done
 
-Unknown.
+- Make product decisions conscious and explicit — between the human and the agent — instead of silently inferred by the LLM.
+- Define what to measure before building, so teams build knowing how the outcome will be evaluated.
+- Preserve the reasoning, evidence and expected outcome of every product decision, versioned in the repo.
 
 ## Business model
 
-Unknown.
+Open source (MIT). Distributed via npm (`siftos` package, publish pending). No pricing, no sales motion, no paid tiers.
 
 ## Product stage
 
-Unknown.
+Early. v0.2.0. npm publish not yet done — planned as part of the landing launch. Product memory was placeholder ("Unknown.") until this session.
 
 ## Positioning
 
-Unknown.
+"Better product decisions — not inferred by the LLM, but consciously made between you and your agent. Build knowing what to measure." [User's own formulation, confirmed in design session 2026-08-17]
 
 ## Current constraints
 
-Unknown.
+- Not yet published to npm; `npx siftos install` fails today (404).
+- No testimonials, customers, benchmarks, pricing or usage claims — must not be fabricated.
+- No analytics on the landing (v1 decision); success signals are GitHub stars and issues opened.
+- Landing copy must be written in English; all repo content (README, docs, quickstart) is English.
+- Landing must not duplicate README/docs content — link to it instead.
 
 ## Non-goals
 
-Unknown.
+- No automatic intervention: lifecycle adapters (advisory/balanced/strict) are explicitly user-chosen, never default-on.
+- No remote database; local-first, Git-native. `.product/` is the source of truth.
+- SiftOS does not replace human judgment; the human owns every decision.
 
 ## Relevant systems
 
-Unknown.
+- OpenCode and Codex agent skills (`.agents/skills/siftos/`)
+- npm registry (target distribution channel)
+- GitHub: felipcsousa/siftos repo; GitHub Pages project site (`felipcsousa.github.io/siftos`, base `/siftos/`) via Astro static export
+- `.product/` memory layout (PRODUCT/STRATEGY/METRICS/PRINCIPLES/ROADMAP, decisions/, evidence/)
 
 ## Additional context
 
-Unknown.
+- Landing scope (confirmed in design session 2026-08-17): hero with copy-paste CTAs, problem section, how-it-works, example PDR, copy CTA block, contributing + request-improvements (link to issues), footer.
+- Primary visitor persona: PM/head of product; conversion action is copying the terminal command or the agent install prompt.
+- Site lives in `site/` subfolder of the repo; CI via GitHub Actions pages workflow.
+- Success criteria: stars and issues moving after launch; re-evaluate in ~3 months.
