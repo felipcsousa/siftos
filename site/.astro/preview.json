@@ -1,0 +1,14 @@
+{
+	"pid": 5126,
+	"port": 4321,
+	"url": "http://localhost:4321",
+	"urls": {
+		"local": [
+			"http://localhost:4321/siftos/"
+		],
+		"network": [],
+		"networkInterfaceNames": []
+	},
+	"background": false,
+	"startedAt": "2026-08-17T19:03:11.488Z"
+}

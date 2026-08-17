@@ -1,0 +1,99 @@
+---
+import '@fontsource/spectral/latin-400.css';
+import '@fontsource/spectral/latin-400-italic.css';
+import '@fontsource/spectral/latin-600.css';
+import '@fontsource/fragment-mono/latin-400.css';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content="https://felipcsousa.github.io/siftos/" />
+    <meta name="theme-color" content="#f6f0e3" />
+    <link rel="icon" type="image/svg+xml" href="/siftos/favicon.svg" />
+    <link rel="canonical" href="https://felipcsousa.github.io/siftos/" />
+  </head>
+  <body>
+    <!--
+      THESIS: SiftOS is the ledger of record for product decisions — the page itself is a
+      ruled folio where every section is a posted entry. It refuses the SaaS default of
+      hero + feature cards + footer, and refuses the category's claim that the LLM can
+      decide for you: here, every decision is a conscious, dated, measured entry.
+      SIGNATURE: the live entry stamps DECIDED on load; the copy slips post like stamps.
+      SEED: 14db2138 (direction roll, persuade, 2026-08-17)
+      accent for the active entry and the balance. Spectral editorial serif + Fragment Mono
+      for commands and figures. Entries are append-only; prediction weight is line weight.
+      SIGNATURE: the live entry stamps DECIDED on load; the copy slips post like stamps.
+    -->
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main">
+      <slot />
+    </main>
+    <script>
+      // Copy-to-clipboard for [data-copy] controls, with stamp feedback.
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[data-copy]');
+      const fallback = (text: string) => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } finally {
+          ta.remove();
+        }
+      };
+      const copy = (text: string) =>
+        navigator.clipboard?.writeText(text).catch(() => fallback(text)) ??
+        Promise.resolve(fallback(text));
+
+      buttons.forEach((btn) => {
+        const original = btn.dataset.label ?? btn.textContent ?? 'Copy';
+        btn.addEventListener('click', async () => {
+          await copy(btn.dataset.copy ?? '');
+          btn.dataset.copied = 'true';
+          btn.textContent = 'Copied';
+          setTimeout(() => {
+            btn.dataset.copied = 'false';
+            btn.textContent = original;
+          }, 2000);
+        });
+      });
+
+      // The hero entry posts its outcome when the PDR file scrolls into view.
+      const heroEntry = document.getElementById('hero-entry');
+      const exampleFile = document.getElementById('example-file');
+      if (heroEntry && exampleFile && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              if (e.isIntersecting) {
+                heroEntry.dataset.measured = 'true';
+                io.disconnect();
+              }
+            }
+          },
+          { threshold: 0.35 }
+        );
+        io.observe(exampleFile);
+      }
+    </script>
+  </body>
+</html>
