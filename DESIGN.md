@@ -71,11 +71,11 @@ components:
 
 **Creative North Star: "The Decision Ledger"**
 
-The page is the book of record for product decisions: a ruled folio in warm ivory paper where every section is a posted, dated entry. The conceit is load-bearing, not decorative — the product's own loop (Decision → Prediction → Outcome → Learning) is literally the ledger cycle, and the visitor's job (copy the install command) is a posting slip. The world refuses the SaaS default of hero + feature cards + footer, and refuses the category's claim that the LLM decides for you: here, every decision is conscious, dated, and measured. The form is print grammar — hairlines, tabular figures, stamps, margin annotations — executed with editorial typography, not spreadsheet gray. One authored motion moment (the DECIDED stamp posting on load) carries the whole animation budget; the entry's measure-on-scroll state flip (Decided → Measured when the PDR file enters view) reuses the same stamp.
+The page is the book of record for product decisions: a ruled folio in warm ivory paper where every section is a posted, dated entry. The conceit is load-bearing, not decorative — the product's own loop (Decision → Prediction → Outcome → Learning) is literally the ledger cycle, and the visitor's job (copy the install command) is a posting slip. The world refuses the SaaS default of hero + feature cards + footer, and refuses the category's claim that the LLM decides for you: here, every decision is conscious, dated, and measured. The form is print grammar — hairlines, tabular figures, stamps, margin annotations — executed with editorial typography, not spreadsheet gray. One authored motion moment (the DECIDED stamp posting on load) carries the whole animation budget.
 
 **Key Characteristics:**
 - Ruled folio: thin blue-gray hairlines as the only separators; double rules under the folio header
-- One accent: vermilion marks the active entry, the balance figure, and copy actions — nothing else
+- One accent: vermilion marks the active entry, the stats figures, and copy actions — nothing else
 - Entries are append-only: dated, struck-through alternatives, outcomes that post later
 - Prediction confidence is line weight
 - Self-hosted Spectral (editorial serif) + Fragment Mono (commands, labels, figures)
@@ -85,7 +85,7 @@ The page is the book of record for product decisions: a ruled folio in warm ivor
 Warm ivory paper carrying near-black ink, blue-gray ruled hairlines, and a single vermilion accent — the palette of a printed ledger, not a screen.
 
 ### Primary
-- **Vermilion Deep** (#9e2f22): The accent at action weight — copy buttons, links, the active stamp, the balance figure. Text on paper at 6.4:1.
+- **Vermilion Deep** (#9e2f22): The accent at action weight — copy buttons, links, the active stamp, the stats figures. Text on paper at 6.4:1.
 - **Vermilion** (#c73a2b): Hover state of the accent; never used for small text on paper.
 
 ### Neutral
@@ -99,7 +99,7 @@ Warm ivory paper carrying near-black ink, blue-gray ruled hairlines, and a singl
 - **Rule Strong** (#7f8698): Double rules, slip borders, struck lines.
 
 ### Named Rules
-**The One Accent Rule.** Vermilion covers at most ~5% of any viewport: the active entry's stamp, the balance figure, and the copy buttons. If a new element needs emphasis, it earns ink weight, never a second color. Statuses (decided, measured) live in ink tones; only the *active* decision gets vermilion.
+**The One Accent Rule.** Vermilion covers at most ~5% of any viewport: the active entry's stamp, the stats figures, and the copy buttons. If a new element needs emphasis, it earns ink weight, never a second color. Statuses (decided, measured) live in ink tones; only the *active* decision gets vermilion.
 
 ## Typography
 
@@ -118,12 +118,12 @@ Warm ivory paper carrying near-black ink, blue-gray ruled hairlines, and a singl
 - **Command** (Fragment Mono, 0.9375rem, 1.6): Copyable commands in slips.
 
 ### Named Rules
-**The Tabular Rule.** Every figure — balances, predictions, outcomes, folio dates — uses `font-variant-numeric: tabular-nums`. Numbers align in columns like a ledger, never like prose.
+**The Tabular Rule.** Every figure — stats, predictions, outcomes, folio dates — uses `font-variant-numeric: tabular-nums`. Numbers align in columns like a ledger, never like prose.
 **The No-Eyebrow Rule.** Nothing sits above a heading as a label. The folio line is page furniture (top-right, tiny, mono), never a heading announcement.
 
 ## Layout
 
-Single column, max 1080px, 1.5rem gutters. Two pages: the landing (Persuade) and How it works (Read), sharing the masthead, folio furniture, footer, and the ledger grammar. The How-it-works page uses a two-column layout — a sticky folio index (13rem) beside the phase sections — collapsing to a single column and a wrapping index below 860px. Sections stack as folio entries, each closed by a 1px rule; vertical rhythm is `clamp(3.5rem, 9vw, 6.5rem)` between sections, with more space above a heading than below it. Three-column entry grids and the four-column loop collapse to 1fr at 860px; slip and contrib grids collapse at 620px. The hero is folio header → headline → balance line → live entry → posting slips, in that order.
+Single column, max 1080px, 1.5rem gutters. Two pages: the landing (Persuade) and How it works (Read), sharing the masthead, folio furniture, footer, and the ledger grammar. The How-it-works page uses a two-column layout — a sticky folio index (13rem) beside the phase sections — collapsing to a single column and a wrapping index below 860px. Sections stack as folio entries, each closed by a 1px rule; vertical rhythm is `clamp(3.5rem, 9vw, 6.5rem)` between sections, with more space above a heading than below it. Three-column entry grids and the four-column loop collapse to 1fr at 860px; slip and contrib grids collapse at 620px. The hero is masthead → folio → headline → posting slips, in that order; the before/after proof pair and the entry live in the problem section.
 
 ## Elevation & Depth
 
@@ -149,7 +149,7 @@ Print corners: radius 2px everywhere (`--r`). No pills, no 12–16px card radii 
 - **Character:** the product's artifact — a dated, ruled record with prediction, metric, outcome
 - **Shape:** paper-raise, 1px rule border, 2px radius; head row in mono faint with the DEC id and a date stamp
 - **Body:** title, then three columns (Prediction / Metric / Outcome) divided by hairlines; prediction weight rendered as a 4px ink bar (thin variant: 1.5px rule-strong)
-- **Status:** stamp in the foot — decided (ink/active vermilion double ring) or measured (filled vermilion); the hero entry carries both spans and flips via `data-measured` when the PDR file scrolls into view, replaying the stamp-in
+- **Status:** stamp in the foot — decided (active vermilion double ring), posting with the stamp-in on load. The component retains an optional measured state (filled vermilion) for when a real outcome posts; the landing currently shows the honest pending outcome of a real record.
 - **Annotation:** italic ink-soft with a 2px rule border-left, read as a margin note
 
 ### PDR File Block
@@ -181,7 +181,7 @@ Print corners: radius 2px everywhere (`--r`). No pills, no 12–16px card radii 
 - **Shape:** paper-raise band, 1px rule border; each step has a mono number (01–04), a title, and ink-soft copy; arrow SVGs sit in the gutters, hidden on collapse
 ### Stats Line
 - **Character:** the proof in numbers — twelve workflows, five memory files, zero automatic interventions by default, one source of truth
-- **Shape:** mono labels with serif display figures, ruled band top and bottom; the figures mirror the balance-line grammar (the same printed ledger look)
+- **Shape:** mono labels with serif display figures, ruled band top and bottom; the figures mirror the printed-ledger look of the stats
 
 ### Protocol Command Grid
 - **Character:** the vocabulary — twelve commands that name one kind of intervention each
@@ -198,7 +198,7 @@ Print corners: radius 2px everywhere (`--r`). No pills, no 12–16px card radii 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep vermilion to the active entry, the balance figure, and copy actions — the One Accent Rule.
+- **Do** keep vermilion to the active entry, the stats figures, and copy actions — the One Accent Rule.
 - **Do** set all figures in tabular numerals.
 - **Do** separate with hairlines; a section without a rule is off-system.
 - **Do** draw icons as inline SVG at 1.5 stroke in currentColor.
