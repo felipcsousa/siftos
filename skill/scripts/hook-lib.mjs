@@ -14,7 +14,14 @@ const ENFORCEMENTS = new Set(["off", "advisory", "balanced", "strict"]);
 const FAILURE_POLICIES = new Set(["fail_open", "fail_closed"]);
 const PRESETS = new Set(["off", "advisory", "balanced", "strict", "custom"]);
 const AUTHORIZING_RESOLUTIONS = new Set(["prototype", "existing_bet", "build_anyway"]);
-const POLICY = JSON.parse(readFileSync(new URL("./policy.json", import.meta.url), "utf8"));
+let POLICY;
+let POLICY_LOAD_FAILED = false;
+try {
+  POLICY = JSON.parse(readFileSync(new URL("./policy.json", import.meta.url), "utf8"));
+} catch {
+  POLICY_LOAD_FAILED = true;
+  POLICY = { build_authorizing_statuses: [], ship_gate_statuses: [], guard: { l3: [], l2: [], l1: [], non_product_paths: [], candidate: { obvious_product: [], technical: [], possible_product: [] } } };
+}
 const BUILD_AUTHORIZING_STATUSES = new Set(POLICY.build_authorizing_statuses);
 const SHIP_GATE_STATUSES = new Set(POLICY.ship_gate_statuses);
 const L3_PATTERNS = POLICY.guard.l3.map((value) => new RegExp(value, "i"));
@@ -61,7 +68,10 @@ export function loadRuntime(root) {
       ship_gate: { ...base.ship_gate, ...(raw.ship_gate ?? {}) },
       heartbeat: { ...(raw.heartbeat ?? {}) }, metrics: { ...(raw.metrics ?? {}) },
     };
-  } catch { return defaultRuntime(); }
+  } catch (error) {
+    console.warn("warning: .product/.runtime/session.json is unreadable; resetting to a fresh runtime state");
+    return defaultRuntime();
+  }
 }
 
 export function saveRuntime(root, state) {
@@ -88,14 +98,17 @@ export function validateHooksBlock(raw) {
 function normalizePreset(value) { return PRESETS.has(value) ? value : null; }
 function presetHook(preset, name) {
   if (preset === "off") return { enabled: false };
-  if (name === "before_mutation") return { enabled: true, enforcement: preset, failure_policy: preset === "strict" ? "fail_closed" : "fail_open" };
+  if (name === "before_mutation") return { enabled: true, enforcement: preset, failure_policy: preset === "advisory" ? "fail_open" : "fail_closed" };
   if (name === "turn_stop") return { enabled: true, enforcement: preset, failure_policy: "fail_open" };
   if (name === "prompt_submit") return { enabled: true, enforcement: "advisory", failure_policy: "fail_open" };
   return { enabled: true, failure_policy: "fail_open" };
 }
 
 export function effectiveHook(root, name, state = loadRuntime(root)) {
-  const repo = loadJson(path.join(root, ".product", "config.json"));
+  let repo = loadJson(path.join(root, ".product", "config.json"));
+  // Ownership rule mirrors the CLI (repo.ts loadConfig): a config.json whose
+  // name is not "siftos" is not SiftOS policy — CLI and harness must agree.
+  if (repo && repo.name && repo.name !== "siftos") repo = null;
   const global = loadJson(path.join(os.homedir(), ".siftos", "config.json"));
   const validation = validateHooksBlock(repo?.hooks ?? null);
   if (!validation.valid) {
@@ -120,7 +133,7 @@ export function effectiveHook(root, name, state = loadRuntime(root)) {
 export function observe(root, state, hookName) { state.heartbeat[hookName] = now(); saveRuntime(root, state); }
 function resolutionFromPrompt(prompt) {
   const text = String(prompt ?? "").toLowerCase();
-  if (/\b(build anyway|just (build|implement)|skip (the )?(product )?(check|guard)|proceed anyway)\b/.test(text)) return "build_anyway";
+  if (/\b(build anyway|skip (the )?(product )?(check|guard)|proceed anyway)\b/.test(text)) return "build_anyway";
   if (/\bprototype\b/.test(text)) return "prototype";
   if (/\b(existing bet|use (the )?bet|attach .*bet)\b/.test(text) || /\bDEC-\d{4}\b/i.test(String(prompt ?? ""))) return "existing_bet";
   if (/\bshape\b/.test(text)) return "shape"; if (/\bvalidate\b/.test(text)) return "validate"; if (/\breconsider\b/.test(text)) return "reconsider";
@@ -166,11 +179,13 @@ function strings(value, out = []) {
 export function toolStrings(toolInput) { return strings(toolInput ?? {}); }
 function shellEffect(command) {
   const cmd = String(command ?? "").trim(); if (!cmd) return "read";
+  // Compound shell commands may write files — never classify by prefix alone.
+  if (/[>|;&]/.test(cmd)) return "mutation";
+  if (/\b(?:npm|pnpm|yarn)\s+(?:install|i|add|run\s+build|build)\b/i.test(cmd)) return "mutation";
+  if (/\b(?:rm|mv|cp|mkdir|touch)\b|\bsed\s+-i\b|\bgit\s+(?:checkout|reset|clean|commit|add|restore)\b/i.test(cmd)) return "mutation";
   if (/^(?:npm|pnpm|yarn)\s+(?:test|run\s+(?:test|typecheck))(?:\s|$)/i.test(cmd)) return "verification";
   if (/^(?:pwd|ls|find|cat|head|tail|rg|grep)(?:\s|$)/i.test(cmd) || /^git\s+(?:status|diff|log|show)(?:\s|$)/i.test(cmd)) return "read";
   if (/^(?:node|npm|pnpm|yarn)\s+--version(?:\s|$)/i.test(cmd)) return "read";
-  if (/\b(?:npm|pnpm|yarn)\s+(?:install|i|add|run\s+build|build)\b/i.test(cmd) || /[>|;&]/.test(cmd)) return "mutation";
-  if (/\b(?:rm|mv|cp|mkdir|touch)\b|\bsed\s+-i\b|\bgit\s+(?:checkout|reset|clean|commit|add|restore)\b/i.test(cmd)) return "mutation";
   return "unknown";
 }
 export function classifyToolEffect(toolName, toolInput) {
@@ -196,12 +211,19 @@ function verdict(level, enforcement) {
   return level === "L2" || level === "L3" ? "BLOCK_UNTIL_RESOLVED" : "ALLOW";
 }
 export function beforeMutation(root, { toolName, toolInput }) {
+  if (POLICY_LOAD_FAILED) return { allowed: false, disabled: false, level: null, verdict: "CONFIG_ERROR", message: "SiftOS Product Guard configuration error: policy data is unreadable/corrupt. Mutation is denied until the skill policy is fixed." };
   const state = loadRuntime(root); const hook = effectiveHook(root, "before_mutation", state);
   if (hook.config_error) return { allowed: false, disabled: false, level: null, verdict: "CONFIG_ERROR", message: `SiftOS Product Guard configuration error: ${hook.config_error}. Fix .product/config.json; mutation is denied until policy is unambiguous.` };
   if (!hook.enabled) return { allowed: true, disabled: true, level: null, verdict: "ALLOW", message: "" };
   state.heartbeat.before_mutation = now(); const effect = classifyToolEffect(toolName, toolInput);
   if (effect === "read" || effect === "verification" || effect === "siftos_internal") { saveRuntime(root, state); return { allowed: true, level: "L0", verdict: "ALLOW", message: "" }; }
-  const level = classifyLevel(state, toolName, toolInput); state.guard.intent_id = state.turn_id ?? state.guard.intent_id ?? "unknown-turn"; state.guard.level = level;
+  const level = classifyLevel(state, toolName, toolInput);
+  // A new turn_id with no intervening startTurn must not inherit a stale
+  // authorizing resolution from a previous turn.
+  if (state.turn_id && state.guard.intent_id !== state.turn_id) {
+    state.guard = { intent_id: state.turn_id, status: "unresolved", level: null, resolution: null, block_issued: false };
+  }
+  state.guard.intent_id = state.turn_id ?? state.guard.intent_id ?? "unknown-turn"; state.guard.level = level;
   const authorized = state.guard.intent_id === (state.turn_id ?? state.guard.intent_id) && AUTHORIZING_RESOLUTIONS.has(state.guard.resolution) && (state.guard.status === "resolved" || state.guard.status === "bypassed");
   if (authorized) { state.mutation.started = true; saveRuntime(root, state); return { allowed: true, level, verdict: "ALLOW", message: `SiftOS Product Guard resolved via ${state.guard.resolution}.` }; }
   const gate = verdict(level, hook.enforcement ?? "advisory");
@@ -244,7 +266,7 @@ export function deterministicShipGate(root, decision) {
   const hasExpected = hasContent(sectionItems(decision, "Expected Outcome")); const hasMetric = hasContent(sectionItems(decision, "Primary Metric"));
   if (!hasExpected && !hasMetric) { error("missing-expected-outcome", "No expected outcome or primary metric recorded."); error("missing-metric", "No primary metric or expected outcome to measure."); } else if (!hasExpected) warn("missing-expected-outcome", "No quantified expected outcome — only a primary metric.");
   const expectedText = sectionItems(decision, "Expected Outcome").join(" "); if (!/\d/.test(expectedText)) warn("missing-success-threshold", "Success threshold is not quantified.");
-  const metrics = readContext(root, "METRICS.md"); const hasBaseline = /baseline:\s*(?!unknown\b)[^\n]*\S/i.test(metrics); if (!hasBaseline && !/\d/.test(expectedText)) warn("missing-baseline", "No baseline — relative success cannot be evaluated.");
+  const metrics = readContext(root, "METRICS.md"); const hasBaseline = /baseline:\s*(?:-\s*)?(?!unknown\b)[^\n]*\S/i.test(metrics); if (!hasBaseline && !/\d/.test(expectedText)) warn("missing-baseline", "No baseline — relative success cannot be evaluated.");
   if (!/\b(instrument|analytics|event|track)\b/i.test(bodyText(decision))) warn("missing-instrumentation", "No instrumentation/measurement plan detected.");
   if (!hasContent(sectionItems(decision, "Guardrails"))) warn("missing-guardrail", "No guardrails defined."); if (!hasContent(sectionItems(decision, "Revisit Condition"))) warn("missing-review-condition", "No revisit condition defined."); if (!hasContent(sectionItems(decision, "Scope"))) warn("missing-scope", "No scope defined — scope drift cannot be checked.");
   if (findings.some((finding) => finding.severity === "ERROR")) return { result: "FAIL", findings }; return { result: findings.length ? "PASS_WITH_WARNINGS" : "PASS", findings };

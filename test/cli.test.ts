@@ -81,8 +81,16 @@ Signup requires a credit card.
 `;
 
 let tmp: string;
-beforeAll(() => { tmp = mkdtempSync(path.join(os.tmpdir(), "siftos-cli-")); mkdirSync(path.join(tmp, ".git")); });
-afterAll(() => { rmSync(tmp, { recursive: true, force: true }); });
+let fixtureTmp: string;
+beforeAll(() => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), "siftos-cli-")); mkdirSync(path.join(tmp, ".git"));
+  // Independent fixture repo for search/show/context: those tests must not
+  // depend on the validate test having written DEC-0042 into tmp first.
+  fixtureTmp = mkdtempSync(path.join(os.tmpdir(), "siftos-cli-fixture-")); mkdirSync(path.join(fixtureTmp, ".git"));
+  runCli(["init"], fixtureTmp);
+  writeFileSync(path.join(fixtureTmp, ".product", "decisions", "DEC-0042-credit-card.md"), FIXTURE_DECISION);
+});
+afterAll(() => { rmSync(tmp, { recursive: true, force: true }); rmSync(fixtureTmp, { recursive: true, force: true }); });
 
 describe("siftos CLI", () => {
   it("version prints the package version", () => {
@@ -112,9 +120,13 @@ describe("siftos CLI", () => {
   });
 
   it("next-id starts at DEC-0001 and advances", () => {
-    expect(runCli(["next-id"], tmp).stdout).toBe("DEC-0001");
-    writeFileSync(path.join(tmp, ".product", "decisions", "DEC-0001-x.md"), "---\nid: DEC-0001\ntitle: X\ncreated_at: 2026-01-01\nupdated_at: 2026-01-01\n---\n# Decision\n");
-    expect(runCli(["next-id"], tmp).stdout).toBe("DEC-0002");
+    // Isolated repo: next-id must not depend on decisions written by other
+    // tests into the shared tmp dir.
+    const fresh = mkdtempSync(path.join(os.tmpdir(), "siftos-nextid-")); mkdirSync(path.join(fresh, ".git")); runCli(["init"], fresh);
+    expect(runCli(["next-id"], fresh).stdout).toBe("DEC-0001");
+    writeFileSync(path.join(fresh, ".product", "decisions", "DEC-0001-x.md"), "---\nid: DEC-0001\ntitle: X\ncreated_at: 2026-01-01\nupdated_at: 2026-01-01\n---\n# Decision\n");
+    expect(runCli(["next-id"], fresh).stdout).toBe("DEC-0002");
+    rmSync(fresh, { recursive: true, force: true });
   });
 
   it("validate passes a clean decision and fails on schema errors", () => {
@@ -144,18 +156,18 @@ describe("siftos CLI", () => {
   });
 
   it("search finds by query and tag filter", () => {
-    expect(runCli(["search", "credit card"], tmp).stdout).toContain("DEC-0042");
-    expect(runCli(["search", "--tag=onboarding"], tmp).stdout).toContain("DEC-0042");
-    expect(runCli(["search", "quantum"], tmp).stdout).toContain("0 result(s)");
+    expect(runCli(["search", "credit card"], fixtureTmp).stdout).toContain("DEC-0042");
+    expect(runCli(["search", "--tag=onboarding"], fixtureTmp).stdout).toContain("DEC-0042");
+    expect(runCli(["search", "quantum"], fixtureTmp).stdout).toContain("0 result(s)");
   });
 
   it("show prints a decision summary", () => {
-    const result = runCli(["show", "DEC-0042"], tmp);
+    const result = runCli(["show", "DEC-0042"], fixtureTmp);
     expect(result.code).toBe(0); expect(result.stdout).toContain("id: DEC-0042"); expect(result.stdout).toContain("## Context");
   });
 
   it("context compiles a package with product files and related decisions", () => {
-    const result = runCli(["context", "credit card"], tmp);
+    const result = runCli(["context", "credit card"], fixtureTmp);
     expect(result.code).toBe(0); expect(result.stdout).toContain('<context source="PRODUCT.md">'); expect(result.stdout).toContain("Related decision: DEC-0042");
   });
 

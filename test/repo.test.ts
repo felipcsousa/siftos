@@ -147,9 +147,15 @@ describe("ProductRepository", () => {
   });
 
   it("listDecisions parses all files sorted by id", () => {
-    const repo = new ProductRepository(tmp);
+    // Isolated repo: the expected id set must not depend on which earlier
+    // tests happened to save into the shared tmp.
+    const fresh = mkdtempSync(path.join(os.tmpdir(), "siftos-list-")); mkdirSync(path.join(fresh, ".git"));
+    const repo = new ProductRepository(fresh);
+    repo.saveDecision(makeDecision({ id: "DEC-0001", title: "First" }), { now: NOW });
+    repo.saveDecision(makeDecision({ id: "DEC-0002", title: "Second" }), { now: NOW });
     const ids = repo.listDecisions().map((d) => d.id);
     expect(ids).toEqual(["DEC-0001", "DEC-0002"]);
+    rmSync(fresh, { recursive: true, force: true });
   });
 
   it("serializes decision with slugified title file name", () => {

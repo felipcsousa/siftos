@@ -69,4 +69,14 @@ describe("guardVerdict", () => {
     expect(guardVerdict("L3", "strict")).toBe("REQUIRE_RESOLUTION");
     expect(guardVerdict("UNKNOWN", "strict")).toBe("REQUIRE_RESOLUTION");
   });
+
+  it("enabled without enforcement resolves to advisory (pinned fallback)", () => {
+    // An entry like { before_mutation: { enabled: true } } has no enforcement.
+    // Current contract: undefined enforcement behaves like advisory (never
+    // blocks). This test pins that behavior so any change to the fallback —
+    // e.g. failing closed on ambiguous config — is deliberate.
+    expect(guardVerdict("L2", undefined as never)).toBe("ALLOW");
+    expect(guardVerdict("L2", "advisory")).toBe("ALLOW");
+    expect(guardVerdict("L2", "balanced")).toBe("BLOCK_ONCE");
+  });
 });

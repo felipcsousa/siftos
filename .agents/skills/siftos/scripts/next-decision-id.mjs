@@ -8,7 +8,7 @@ import { findProductRoot, decisionFiles, withLock } from "./lib.mjs";
 function computeNextId(root) {
   let max = 0;
   for (const file of decisionFiles(root)) {
-    const m = file.match(/^DEC-(\d{4})/);
+    const m = file.match(/^DEC-(\d{4})(?:-|\.md$)/);
     if (!m) continue;
     const n = Number(m[1]);
     if (n > max) max = n;

@@ -151,13 +151,13 @@ export class ProductRepository {
   decisionFileNames(): string[] {
     if (!existsSync(this.decisionsDir)) return [];
     return readdirSync(this.decisionsDir)
-      .filter((f) => /^DEC-\d{4}.*\.md$/.test(f) && f.endsWith(".md"))
+      .filter((f) => /^DEC-\d{4}(?:-|\.md$)/.test(f) && f.endsWith(".md"))
       .sort();
   }
 
   decisionIds(): string[] {
     return this.decisionFileNames()
-      .map((f) => f.match(/^(DEC-\d{4})/)?.[1])
+      .map((f) => f.match(/^(DEC-\d{4})(?:-|\.md$)/)?.[1])
       .filter((id): id is string => id !== undefined)
       .sort();
   }
@@ -219,7 +219,8 @@ export class ProductRepository {
   }
 
   readDecision(id: string): Decision {
-    const file = this.decisionFileNames().find((f) => f.startsWith(id));
+    // Exact-id match: DEC-0001 must not bind to a malformed DEC-00010-*.md.
+    const file = this.decisionFileNames().find((f) => f === `${id}.md` || f.startsWith(`${id}-`));
     if (!file) throw new Error(`decision not found: ${id}`);
     const markdown = readFileSync(path.join(this.decisionsDir, file), "utf8");
     return parseDecision(markdown);
@@ -231,7 +232,7 @@ export class ProductRepository {
       try {
         out.push(parseDecision(readFileSync(path.join(this.decisionsDir, file), "utf8")));
       } catch (err) {
-        const id = file.match(/^(DEC-\d{4})/)?.[1] ?? file;
+        const id = file.match(/^(DEC-\d{4})(?:-|\.md$)/)?.[1] ?? file;
         throw new Error(`failed to parse ${file}: ${(err as Error).message}`);
       }
     }
@@ -247,7 +248,7 @@ export class ProductRepository {
     { now, overwrite = false }: { now: string; overwrite?: boolean },
   ): string {
     return this.withLock(() => {
-      const existing = this.decisionFileNames().find((f) => f.startsWith(decision.id));
+      const existing = this.decisionFileNames().find((f) => f === `${decision.id}.md` || f.startsWith(`${decision.id}-`));
       if (existing !== undefined && !overwrite) {
         throw new Error(
           `decision id conflict: ${decision.id} already exists — decision IDs are permanent and never reused (PRD §26); pass overwrite: true to update it in place`,

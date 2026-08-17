@@ -8,7 +8,7 @@ description: >-
   prioritization, diagnosis, Ship Gate, outcomes, decision history, audits,
   or hook configuration. Product memory lives in .product/ (Markdown + Git).
   Human owns the decision; automation is always user-chosen.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # SiftOS

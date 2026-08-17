@@ -4,6 +4,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { findProductRoot } from "./lib.mjs";
+import { validateHooksBlock } from "./hook-lib.mjs";
 
 const HOOK_NAMES = [
   ["session_start", "Session Start"],
@@ -19,7 +20,7 @@ const HOOK_NAMES = [
 const PRESETS = {
   off: { all: false },
   advisory: { all: true, advisory: ["before_mutation", "turn_stop", "prompt_submit"] },
-  balanced: { all: true, balanced: ["before_mutation"], advisory: ["turn_stop", "prompt_submit"] },
+  balanced: { all: true, balanced: ["before_mutation", "turn_stop"], advisory: ["prompt_submit"] },
   strict: { all: true, strict: ["before_mutation", "turn_stop"], advisory: ["prompt_submit"] },
 };
 
@@ -49,7 +50,15 @@ function main() {
   } catch {
     /* no config: hooks off */
   }
+  // Ownership rule mirrors the CLI: a config.json whose name is not "siftos"
+  // is not SiftOS policy.
+  if (config.name && config.name !== "siftos") config = {};
   const rawHooks = config.hooks ?? null;
+  const validation = validateHooksBlock(rawHooks);
+  if (!validation.valid) {
+    console.error("error: invalid repository hooks config in .product/config.json; fix it before relying on hook policy");
+    process.exit(1);
+  }
   const preset = rawHooks?.preset ?? null;
 
   let hooks;

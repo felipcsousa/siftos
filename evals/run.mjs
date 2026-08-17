@@ -9,7 +9,7 @@
 //
 // Usage: node evals/run.mjs   (after `npm run build`; falls back to tsx)
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +21,23 @@ const TODAY = "2026-08-13";
 function cliCommand() {
   const dist = path.join(root, "dist", "cli.js");
   if (existsSync(dist)) {
+    // A stale dist silently evals old code: warn when any src file is newer
+    // than the built CLI so a forgotten rebuild cannot hide a regression.
+    const newestSource = (() => {
+      let newest = 0;
+      const scan = (dir) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const p = path.join(dir, entry.name);
+          if (entry.isDirectory()) scan(p);
+          else if (entry.name.endsWith(".ts")) newest = Math.max(newest, statSync(p).mtimeMs);
+        }
+      };
+      scan(path.join(root, "src"));
+      return newest;
+    })();
+    if (newestSource > statSync(dist).mtimeMs) {
+      console.warn("warning: dist/cli.js is older than src/ — rebuild with `npm run build` before trusting eval results");
+    }
     return { cmd: process.execPath, args: [dist] };
   }
   return { cmd: "npx", args: ["tsx", "src/cli.ts"] };
@@ -54,7 +71,10 @@ function siftos(repoDir, args) {
 function setupFixture(name) {
   const tmp = mkdtempSync(path.join(os.tmpdir(), `siftos-eval-${name}-`));
   run("git", ["init", "-q"], { cwd: tmp });
-  siftos(tmp, ["init", "--dir", tmp]);
+  const init = siftos(tmp, ["init", "--dir", tmp]);
+  if (init.code !== 0) {
+    throw new Error(`eval fixture "${name}": siftos init failed: ${init.stderr || init.stdout}`);
+  }
   const fixtureDir = path.join(root, "evals", "fixtures", name);
   const decisionsSrc = path.join(fixtureDir, "decisions");
   const decisionsDest = path.join(tmp, ".product", "decisions");
@@ -85,7 +105,7 @@ function assert(name, actual, expected, report) {
 function collectFindings(stdout) {
   const findings = [];
   for (const line of stdout.split("\n")) {
-    const m = line.match(/^DEC-\d{4}\s+(ERROR|WARNING)\s+([a-z-]+):/);
+    const m = line.match(/^DEC-\d{4}\s+(ERROR|WARNING)\s+([a-z0-9_-]+):/);
     if (m) findings.push({ severity: m[1], rule: m[2] });
   }
   return findings;
@@ -105,7 +125,7 @@ function countBlock(stdout, header) {
       inBlock = false;
       continue;
     }
-    if (inBlock && /^DEC-\d{4}/.test(line.trim())) count += 1;
+    if (inBlock && /^DEC-\d{4}$/.test(line.trim())) count += 1;
   }
   return count;
 }

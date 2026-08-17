@@ -100,7 +100,7 @@ export function decisionFiles(root) {
   const dir = path.join(root, ".product", "decisions");
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((f) => /^DEC-\d{4}.*\.md$/.test(f))
+    .filter((f) => /^DEC-\d{4}(?:-|\.md$)/.test(f))
     .sort();
 }
 
@@ -177,7 +177,7 @@ export function parseDecisionFile(root, file) {
   const raw = readMarkdown(path.join(root, ".product", "decisions", file));
   const { fields, body: bodyMarkdown } = splitFrontmatter(raw);
   const body = parseBody(bodyMarkdown);
-  const id = fields.id ?? (file.match(/^(DEC-\d{4})/) ?? [])[1];
+  const id = fields.id ?? (file.match(/^(DEC-\d{4})(?:-|\.md$)/) ?? [])[1];
   if (!id || !DEC_ID_RE.test(id)) throw new Error(`${file}: invalid or missing id`);
   const status = fields.status ?? "draft";
   if (!STATUSES.includes(status)) throw new Error(`${file}: invalid status "${status}"`);

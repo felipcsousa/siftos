@@ -51,6 +51,8 @@ npx siftos install
 siftos init
 ```
 
+Full walkthrough — first bet in 10 minutes: [docs/quickstart.md](docs/quickstart.md).
+
 Then ask your agent:
 
 ```text
