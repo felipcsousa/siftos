@@ -1,0 +1,5 @@
+# siftos-ignore-start
+# Disposable runtime + derived indexes (regenerable).
+.runtime/
+.index/
+# siftos-ignore-end
