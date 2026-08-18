@@ -6,3 +6,7 @@ npm-debug.log*
 
 # Impeccable design session artifacts
 .impeccable/
+# Astro build artifacts (site/)
+site/.astro/
+site/dist/
+site/node_modules/
