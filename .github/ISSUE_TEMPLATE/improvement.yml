@@ -1,0 +1,31 @@
+name: Improvement request
+description: Suggest an improvement to SiftOS — a workflow, a decision format, or a gap in the protocol.
+title: "Improvement: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What should improve?
+      description: The workflow, format, or behavior that should exist or change.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: The decision-making situation this improves, and what you expect to measure.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: What would "done" look like?
+      description: The observable result that would close this issue.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the existing issues and CONTRIBUTING.md
+          required: true

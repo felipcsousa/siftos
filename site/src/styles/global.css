@@ -1,0 +1,994 @@
+/* ============================================================
+   SiftOS landing — Decision Ledger world
+   ============================================================ */
+
+:root {
+  /* paper and ink */
+  --paper: #f6f0e3;
+  --paper-deep: #efe6d2;
+  --paper-raise: #fbf7ee;
+  --ink: #23262b;
+  --ink-soft: #5d626b;
+  --ink-faint: #666b74;
+
+  /* ruled lines — ledger blue-gray */
+  --rule: #a9afbd;
+  --rule-strong: #7f8698;
+
+  /* the one accent — vermilion */
+  --accent: #c73a2b;
+  --accent-deep: #9e2f22;
+
+  /* typography */
+  --font-display: 'Spectral', 'Georgia', serif;
+  --font-body: 'Spectral', 'Georgia', serif;
+  --font-mono: 'Fragment Mono', 'SFMono-Regular', monospace;
+
+  --step-0: 1.0625rem;
+  --step-1: 1.25rem;
+  --step-2: 1.625rem;
+  --step-3: 2.25rem;
+  --step-4: clamp(2.5rem, 5.5vw, 4.25rem);
+
+  --measure: 68ch;
+  --r: 2px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+a {
+  color: var(--accent-deep);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* inline code in prose — the ledger's annotations */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--paper-deep);
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
+}
+
+/* code blocks are their own surface — no chip, no padding */
+.slip-code code,
+.pdr-file pre code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ---------- ledger furniture ---------- */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.double-rule {
+  border: 0;
+  border-top: 1px solid var(--rule-strong);
+  position: relative;
+  height: 8px;
+  margin: 0;
+}
+
+.double-rule::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5px;
+  border-top: 1px solid var(--rule);
+}
+
+/* brand masthead — the ledger's letterhead */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.masthead-mark {
+  flex: none;
+}
+
+.masthead-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.masthead-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.masthead-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--ink-faint);
+}
+
+.masthead-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-left: auto;
+}
+
+.site-nav-link {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 0.25rem 0;
+}
+
+.site-nav-link:hover {
+  color: var(--accent-deep);
+}
+
+.site-nav-link--current {
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.masthead--footer {
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.masthead--footer .masthead-name {
+  font-size: 1.125rem;
+}
+
+/* page furniture: folio meta */
+
+.folio {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.5rem;
+}
+
+/* skip link, in the folio voice */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+.skip:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 10;
+  background: var(--paper-raise);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  padding: 0.55rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--r);
+}
+
+/* ---------- layout ---------- */
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+section {
+  padding: clamp(3.5rem, 9vw, 6.5rem) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+section:last-of-type {
+  border-bottom: 0;
+}
+
+/* ---------- type ---------- */
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--step-4);
+  font-weight: 600;
+  max-width: 20ch;
+}
+
+h2 {
+  font-size: var(--step-3);
+  max-width: 24ch;
+}
+
+h3 {
+  font-size: var(--step-1);
+  letter-spacing: -0.01em;
+}
+
+p {
+  max-width: var(--measure);
+}
+
+.lead {
+  font-size: var(--step-1);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 56ch;
+}
+
+small,
+.meta {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* ---------- hero ---------- */
+
+.hero {
+  padding-top: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.hero-copy {
+  display: grid;
+  gap: 1.25rem;
+  padding: 2.25rem 0 0;
+}
+
+.compat {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0.75rem 0 0;
+}
+
+.compat strong {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.hero .lead {
+  margin: 0;
+}
+
+/* ---------- ledger entry ---------- */
+
+.entry {
+  border: 1px solid var(--rule);
+  background: var(--paper-raise);
+  box-shadow: 0 1px 0 var(--rule);
+}
+
+.entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.entry-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0 1.25rem;
+}
+
+.entry-title {
+  padding: 1rem 0 0.5rem;
+  font-size: var(--step-2);
+}
+
+.entry-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--rule);
+}
+
+.entry-col {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.entry-col + .entry-col {
+  border-left: 1px solid var(--rule);
+}
+
+.entry-col dt {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.4rem;
+}
+
+.entry-col dd {
+  margin: 0;
+}
+
+/* prediction weight — confidence as line weight */
+.weight {
+  display: block;
+  height: 4px;
+  background: var(--ink);
+  border-radius: 1px;
+  margin-top: 0.5rem;
+  width: 82%;
+}
+
+.weight.thin {
+  height: 1.5px;
+  background: var(--rule-strong);
+  width: 55%;
+}
+
+/* entry lifecycle — the entry posts its outcome when measured */
+.outcome-measured {
+  display: none;
+}
+
+.entry[data-measured] .outcome-awaiting {
+  display: none;
+}
+
+.entry[data-measured] .outcome-measured {
+  display: inline;
+}
+
+.stamp-decided,
+.stamp-measured {
+  display: inline-block;
+}
+
+.stamp-measured {
+  display: none;
+}
+
+.entry[data-measured] .stamp-decided {
+  display: none;
+}
+
+.entry[data-measured] .stamp-measured {
+  display: inline-block;
+}
+
+/* status stamps */
+.stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.6rem;
+  border: 1.5px solid currentColor;
+  border-radius: var(--r);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.stamp--active {
+  color: var(--accent-deep);
+  border-width: 2px;
+  box-shadow: inset 0 0 0 1px currentColor;
+  transform-origin: center;
+}
+
+.stamp--filled {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+  color: var(--paper);
+}
+
+/* stamp-in motion — the one authored moment */
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: scale(1.35) rotate(-2deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96) rotate(0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.stamp--post {
+  animation: stamp-in 480ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+.entry[data-measured] .stamp-measured {
+  animation: stamp-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp--post,
+  .entry[data-measured] .stamp-measured {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* struck-through ghost entry */
+.ghost {
+  position: relative;
+  color: var(--ink-faint);
+  border: 1px dashed var(--rule);
+  background: transparent;
+  padding: 1rem 1.25rem;
+  font-size: var(--step-0);
+}
+
+.ghost::after {
+  content: '';
+  position: absolute;
+  left: 0.4rem;
+  right: 0.4rem;
+  top: 50%;
+  border-top: 1.5px solid var(--rule-strong);
+  transform: rotate(-1deg);
+}
+
+/* ---------- loop ---------- */
+
+.loop {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--rule);
+  background: var(--paper-raise);
+}
+
+.loop-step {
+  padding: 1.25rem 1.1rem 1.4rem;
+  position: relative;
+}
+
+.loop-step + .loop-step {
+  border-left: 1px solid var(--rule);
+}
+
+.loop-step .num {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.loop-step h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 1.0625rem;
+}
+
+.loop-step p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.loop-arrow {
+  position: absolute;
+  right: -0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  color: var(--rule-strong);
+}
+
+/* ---------- copy slips ---------- */
+
+.slips {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.slip {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-raise);
+  box-shadow: 0 2px 0 var(--rule);
+  display: flex;
+  flex-direction: column;
+}
+
+.slip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.slip-code {
+  padding: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.slip-note {
+  padding: 0 1.1rem 1.1rem;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* copy buttons */
+.copy-btn {
+  appearance: none;
+  border: 0;
+  background: var(--accent-deep);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.7rem 1rem;
+  border-radius: var(--r);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 120ms ease-out, transform 120ms ease-out;
+}
+
+.copy-btn:hover {
+  background: var(--accent);
+}
+
+.copy-btn:active {
+  transform: translateY(1px);
+}
+
+.copy-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.copy-btn[data-copied='true'] {
+  background: var(--ink);
+}
+
+/* ---------- PDR file / directory tree ---------- */
+
+.pdr-file {
+  border: 1px solid var(--rule);
+  background: var(--paper-raise);
+  box-shadow: 0 1px 0 var(--rule);
+}
+
+.pdr-file-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.pdr-file pre {
+  margin: 0;
+  padding: 1.1rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.pdr-file .md-key {
+  color: var(--ink-soft);
+}
+
+.pdr-file .md-h2 {
+  font-weight: 600;
+}
+
+/* ---------- contributing ---------- */
+
+.contrib-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.contrib-card {
+  border: 1px solid var(--rule);
+  background: var(--paper-raise);
+  box-shadow: 0 1px 0 var(--rule);
+  padding: 1.5rem 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.contrib-card h3 {
+  margin: 0;
+}
+
+.contrib-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+/* outlined action link — reads as a button, never competes with the accent */
+.contrib-card .go {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--r);
+  color: var(--ink);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.contrib-card .go:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.contrib-card .go:active {
+  transform: translateY(1px);
+}
+
+.contrib-card .go svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---------- footer ---------- */
+
+footer {
+  padding: 1.5rem 0 3rem;
+}
+
+footer .folio {
+  padding-top: 1.25rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 860px) {
+  .entry-cols {
+    grid-template-columns: 1fr;
+  }
+  .entry-col {
+    padding-left: 0;
+  }
+  .entry-col + .entry-col {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    padding-left: 0;
+    padding-top: 0.9rem;
+  }
+  .loop {
+    grid-template-columns: 1fr 1fr;
+  }
+  .loop-step:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .loop-step:nth-child(4) {
+    border-top: 1px solid var(--rule);
+  }
+  .loop-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .slips,
+  .contrib-grid {
+    grid-template-columns: 1fr;
+  }
+  .loop {
+    grid-template-columns: 1fr;
+  }
+  .loop-step + .loop-step {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .weight {
+    height: 5px;
+    width: 92%;
+  }
+  .weight.thin {
+    height: 2.5px;
+  }
+}
+
+/* ---------- before / after proof pair ---------- */
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem 1.25rem;
+  align-items: start;
+}
+
+.proof-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.proof-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.proof-tag::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 1px;
+}
+
+.proof-tag--after::before {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+
+.proof-arrow {
+  align-self: center;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 620px) {
+  .proof-grid {
+    grid-template-columns: 1fr;
+  }
+  .proof-arrow {
+    transform: rotate(90deg);
+  }
+}
+
+/* ---------- protocol command grid ---------- */
+
+.protocol-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--rule);
+  background: var(--paper-raise);
+}
+
+.protocol-item {
+  padding: 1.1rem 1rem 1.2rem;
+}
+
+.protocol-item + .protocol-item {
+  border-left: 1px solid var(--rule);
+}
+
+.protocol-item:nth-child(n + 5) {
+  border-top: 1px solid var(--rule);
+}
+
+.protocol-item code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--accent-deep);
+  background: transparent;
+  padding: 0;
+}
+
+.protocol-item p {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .protocol-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .protocol-item + .protocol-item {
+    border-left: 0;
+  }
+  .protocol-item:nth-child(even) {
+    border-left: 1px solid var(--rule);
+  }
+  .protocol-item:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+@media (max-width: 480px) {
+  .protocol-grid {
+    grid-template-columns: 1fr;
+  }
+  .protocol-item + .protocol-item {
+    border-left: 0;
+  }
+  .protocol-item:nth-child(n + 2) {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+/* ---------- ledger stats line ---------- */
+
+.stats-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2.5rem;
+  align-items: baseline;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+
+.stats-line strong {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.375rem;
+  letter-spacing: -0.01em;
+  color: var(--accent-deep);
+}
+
+/* ---------- commitments list ---------- */
+
+.commitments {
+  border-top: 1px solid var(--rule);
+}
+
+.commitment {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  gap: 1.25rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.commitment-num {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  padding-top: 0.2rem;
+}
+
+.commitment h3 {
+  margin: 0 0 0.3rem;
+  font-size: var(--step-1);
+}
+
+.commitment p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}

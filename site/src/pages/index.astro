@@ -1,0 +1,452 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Masthead from '../components/Masthead.astro';
+import CopySlip from '../components/CopySlip.astro';
+import LedgerEntry from '../components/LedgerEntry.astro';
+
+const terminal = 'npx siftos install';
+const prompt = 'Initialize SiftOS for this product.';
+const repo = 'https://github.com/felipcsousa/siftos';
+const issues = `${repo}/issues/new/choose`;
+---
+
+<Layout
+  title="SiftOS — Product Decision Intelligence for AI-native teams"
+  description="Better product decisions — not inferred by the LLM, but consciously made between you and your agent. Build knowing what to measure. Local-first, Git-native, open source."
+>
+  <!--
+    THESIS: SiftOS is the ledger of record for product decisions — the page itself is a
+    ruled folio where every section is a posted entry. It refuses the SaaS default of
+    hero + feature cards + footer, and refuses the category's claim that the LLM can
+    decide for you: here, every decision is a conscious, dated, measured entry.
+    OWN-WORLD: warm ivory paper, blue-gray ruled hairlines, near-black ink, one vermilion
+    accent for the active entry and the balance. Spectral editorial serif + Fragment Mono
+    for commands and figures. Entries are append-only; prediction weight is line weight.
+    SIGNATURE: the live entry stamps DECIDED on load; the copy slips post like stamps.
+  -->
+
+  <!-- ============ 1. Hero — folio header ============ -->
+  <section class="hero" aria-label="SiftOS">
+    <Masthead current="home" />
+
+    <div class="folio">
+      <span>The ledger of record for product decisions</span>
+      <span class="tabular">Home</span>
+    </div>
+    <div class="hero-copy">
+      <h1>Build knowing what to measure.</h1>
+      <p class="lead">
+        Not inferred by the LLM — decided consciously, between you and your agent. SiftOS
+        keeps every product decision on the record: what you decided, what you predicted,
+        what you measured. Versioned in your repository, not your vendor&rsquo;s cloud.
+      </p>
+      <p class="compat" aria-label="Compatible with">
+        Works with <strong>Codex</strong> · <strong>OpenCode</strong>
+      </p>
+    </div>
+
+
+    <div class="slips" style="margin-top: 2.5rem">
+      <CopySlip
+        command={terminal}
+        label="Install in your terminal"
+        note="Installs the SiftOS skill into your repository. Ships on npm at launch — until then, clone from github.com/felipcsousa/siftos."
+      />
+      <CopySlip
+        command={prompt}
+        label="Paste into your agent"
+        note="Works with Codex and OpenCode. It scaffolds .product/ and your first decision record — then asks what to measure."
+      />
+    </div>
+  </section>
+
+  <!-- ============ 2. Problem — before / after ============ -->
+  <section aria-labelledby="problem">
+    <h2 id="problem">Your LLM already decided for you.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      An idea can become code before anyone notices that a product choice was made. The
+      reasoning, the alternatives, the expected outcome — gone, silently.
+    </p>
+
+    <div class="proof-grid" style="margin-top: 2.5rem">
+      <div class="proof-col">
+        <span class="proof-tag">Before · inferred silently</span>
+        <div class="ghost" aria-label="Silent inference example">
+          Ship deterministic CLI before agent workflows
+          &mdash; no metric &middot; no reasoning &middot; no record
+        </div>
+        <p class="meta" style="margin: 0">
+          The agent shipped a product decision without a record. There is no
+          <code>.product/decisions/DEC-0000.md</code> on disk — only the changed code.
+        </p>
+      </div>
+
+      <svg class="proof-arrow" width="20" height="12" viewBox="0 0 20 12" fill="none" aria-hidden="true">
+        <path d="M1 6h17m0 0-4.5-4.5M18 6l-4.5 4.5" stroke="currentColor" stroke-width="1.5" />
+      </svg>
+
+      <div class="proof-col">
+        <span class="proof-tag proof-tag--after">After · with SiftOS</span>
+        <LedgerEntry
+          id="DEC-0001"
+          date="2026-08-13"
+          title="Ship deterministic CLI before agent workflows"
+          prediction="Local install healthy; sample decisions validate"
+          metric="Number of sample decisions that parse, validate, appear in audit"
+          outcome="Awaiting outcome · review 2026-09-13"
+          status="decided"
+          active={true}
+          annotation="the metric was named before the build"
+        />
+      </div>
+    </div>
+
+    <p style="margin-top: 2rem">
+      SiftOS closes the loop: <strong>Decision &rarr; Prediction &rarr; Outcome &rarr; Learning</strong>.
+      The same decision, made consciously, is the entry above — with a prediction, a
+      metric, and a place for the measured outcome.
+    </p>
+  </section>
+
+  <!-- ============ 3. How it works — the loop ============ -->
+  <section aria-labelledby="loop">
+    <h2 id="loop">The loop that closes.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      Four moves, each one a dated entry in your repository.
+    </p>
+
+    <div class="loop" style="margin-top: 2.5rem">
+      <div class="loop-step">
+        <span class="num">01 · Decision</span>
+        <h3>Shape it consciously</h3>
+        <p>What are we deciding, what are the options, and who owns the call?</p>
+        <svg class="loop-arrow" width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+          <path d="M1 5h15m0 0-4-4m4 4-4 4" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </div>
+      <div class="loop-step">
+        <span class="num">02 · Prediction</span>
+        <h3>Name the metric</h3>
+        <p>Write the expected outcome and the metric that will judge it — before building.</p>
+        <svg class="loop-arrow" width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+          <path d="M1 5h15m0 0-4-4m4 4-4 4" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </div>
+      <div class="loop-step">
+        <span class="num">03 · Outcome</span>
+        <h3>Post the result</h3>
+        <p>When results land, the outcome posts with the measured delta — next to the prediction.</p>
+        <svg class="loop-arrow" width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+          <path d="M1 5h15m0 0-4-4m4 4-4 4" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </div>
+      <div class="loop-step">
+        <span class="num">04 · Learning</span>
+        <h3>Close the loop</h3>
+        <p>What did we get right, and what changes in how this team decides?</p>
+      </div>
+    </div>
+
+    <p style="margin-top: 2rem">
+      The human owns every decision. SiftOS never intervenes automatically — you choose
+      <em>advisory</em>, <em>balanced</em>, or <em>strict</em>. Local-first and Git-native:
+      <code>.product/</code> is the source of truth, in your repository.
+    </p>
+
+    <div class="stats-line" style="margin-top: 2.5rem" aria-label="SiftOS by the numbers">
+      <span><strong class="tabular">12</strong> workflows</span>
+      <span><strong class="tabular">5</strong> memory files</span>
+      <span><strong class="tabular">0</strong> automatic interventions by default</span>
+      <span><strong class="tabular">1</strong> source of truth — <code>.product/</code></span>
+    </div>
+  </section>
+
+  <!-- ============ 4. The protocol — 12 commands ============ -->
+  <section aria-labelledby="protocol">
+    <h2 id="protocol">The protocol. Twelve commands.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      One shared vocabulary for you and your agent — each command names one kind of
+      intervention, from first shape to Ship Gate.
+    </p>
+
+    <div class="protocol-grid" style="margin-top: 2.5rem">
+      <div class="protocol-item">
+        <code>init</code>
+        <p>Build persistent product context progressively.</p>
+      </div>
+      <div class="protocol-item">
+        <code>shape</code>
+        <p>Turn an idea into a Bet — hypothesis, scope, measurement.</p>
+      </div>
+      <div class="protocol-item">
+        <code>decide</code>
+        <p>Structure facts, alternatives, dissent and prediction.</p>
+      </div>
+      <div class="protocol-item">
+        <code>validate</code>
+        <p>Define a Validation Contract before results exist.</p>
+      </div>
+      <div class="protocol-item">
+        <code>challenge</code>
+        <p>Adversarial review without modifying the PDR.</p>
+      </div>
+      <div class="protocol-item">
+        <code>prioritize</code>
+        <p>Compare Bets by strategy, evidence, cost and learning value.</p>
+      </div>
+      <div class="protocol-item">
+        <code>diagnose</code>
+        <p>Find the highest-leverage product health issues.</p>
+      </div>
+      <div class="protocol-item">
+        <code>ship</code>
+        <p>Run the deterministic Ship Gate on an accepted Bet.</p>
+      </div>
+      <div class="protocol-item">
+        <code>review</code>
+        <p>Compare prediction with outcome and extract learning.</p>
+      </div>
+      <div class="protocol-item">
+        <code>show</code>
+        <p>Retrieve decision history.</p>
+      </div>
+      <div class="protocol-item">
+        <code>audit</code>
+        <p>Decision Health plus deterministic linter findings.</p>
+      </div>
+      <div class="protocol-item">
+        <code>hooks</code>
+        <p>Inspect and change lifecycle automation.</p>
+      </div>
+    </div>
+    <p class="meta" style="margin-top: 1rem">
+      A <strong>Bet</strong> is a decision with a hypothesis and a metric you will
+      measure. <strong>Deterministic</strong> means the same inputs always give the same
+      verdict — no arguing with the gate.
+    </p>
+  </section>
+
+  <!-- ============ 5. Example PDR — the record on disk ============ -->
+  <section aria-labelledby="example">
+    <h2 id="example">A decision, kept on the record.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      A Product Decision Record (PDR) is a versioned, human-readable file. This one is
+      real — the first decision recorded in this repository.
+    </p>
+
+    <div class="pdr-file" id="example-file" style="margin-top: 2.5rem">
+      <div class="pdr-file-head">
+        <span>decisions/DEC-0001-deterministic-core-first.md</span>
+        <span class="tabular">2026-08-13</span>
+      </div>
+      <pre><code>---
+<span class="md-key">id</span>: DEC-0001
+<span class="md-key">title</span>: Ship deterministic CLI before agent workflows
+<span class="md-key">status</span>: accepted
+<span class="md-key">created_at</span>: 2026-08-13
+<span class="md-key">owner</span>: siftos-team
+<span class="md-key">confidence</span>: medium
+<span class="md-key">reversibility</span>: high
+<span class="md-key">review_date</span>: 2026-09-13
+---
+
+<span class="md-h2">## Decision</span>
+Ship the deterministic CLI first, agent workflows after.
+
+<span class="md-h2">## Facts</span>
+- The deterministic core has 112 passing unit tests.
+- The eval suite runs deterministic workflows against five fixtures.
+
+<span class="md-h2">## Options Considered</span>
+- A. Ship agent workflows first (rejected)
+- C. Ship both at once (rejected)
+
+<span class="md-h2">## Primary Metric</span>
+Number of sample decisions that parse, validate, and appear in audit.
+
+<span class="md-h2">## Expected Outcome</span>
+Local install is healthy, sample decisions validate, and the audit report
+reflects real content.
+
+<span class="md-h2">## Guardrails</span>
+If a sample PDR fails validation, stop and fix the core before adding more.
+
+<span class="md-h2">## Outcome</span>
+Observed result: unknown. Review: 2026-09-13.</code></pre>
+    </div>
+
+    <p style="margin-top: 1.5rem">
+      Rejected alternatives stay on the record too — struck through, never erased. Read
+      the <a href={`${repo}/blob/main/.product/decisions/DEC-0001-deterministic-core-first.md`}>full record</a>,
+      or the <a href={`${repo}/blob/main/docs/quickstart.md`}>quickstart</a> for the
+      ten-minute walkthrough.
+    </p>
+  </section>
+
+  <!-- ============ 6. What you can rely on ============ -->
+  <section aria-labelledby="rely">
+    <h2 id="rely">Kept on the record, not in a vendor.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      Five commitments the repository itself enforces.
+    </p>
+
+    <div class="commitments" style="margin-top: 2.5rem">
+      <div class="commitment">
+        <span class="commitment-num tabular">01</span>
+        <div>
+          <h3>Decisions are versioned in git</h3>
+          <p>
+            Every PDR is a markdown file with an id, a lifecycle, and a diff. The reasoning
+            travels with the code it shaped — forever.
+          </p>
+        </div>
+      </div>
+      <div class="commitment">
+        <span class="commitment-num tabular">02</span>
+        <div>
+          <h3>Works where your agents work</h3>
+          <p>
+            One canonical skill definition, shared across Codex and OpenCode, no migration.
+          </p>
+        </div>
+      </div>
+      <div class="commitment">
+        <span class="commitment-num tabular">03</span>
+        <div>
+          <h3>The repository is the source of truth</h3>
+          <p>
+            <code>.product/</code> holds the memory. No remote database, no vendor cloud,
+            no export puzzle.
+          </p>
+        </div>
+      </div>
+      <div class="commitment">
+        <span class="commitment-num tabular">04</span>
+        <div>
+          <h3>The human owns every decision</h3>
+          <p>
+            Adapters are advisory, balanced, or strict — always explicit, never
+            default-on.
+          </p>
+        </div>
+      </div>
+      <div class="commitment">
+        <span class="commitment-num tabular">05</span>
+        <div>
+          <h3>Outcomes post, predictions never rewrite</h3>
+          <p>
+            The Ship Gate runs deterministically; the expected outcome stays visible next
+            to the measured one.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 7. Copy CTA — what happens after install ============ -->
+  <section aria-labelledby="start">
+    <h2 id="start">Start your first decision in 10 minutes.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      No account, no database, no vendor. Copy, paste, and the record lives in your repo.
+    </p>
+
+    <div class="pdr-file" style="margin-top: 2.5rem">
+      <div class="pdr-file-head">
+        <span>what siftos init scaffolds into your repo</span>
+        <span class="tabular">.product/</span>
+      </div>
+      <pre><code>.product/
+├── PRODUCT.md
+├── STRATEGY.md
+├── METRICS.md
+├── PRINCIPLES.md
+├── ROADMAP.md
+├── config.json
+├── decisions/
+└── evidence/</code></pre>
+    </div>
+
+    <div style="max-width: 640px; margin-top: 2.5rem">
+      <p class="meta" style="margin: 0 0 1.25rem">
+        Then ask your agent to run
+        <code>siftos init</code> and start your first record: it writes a new
+        <code>.product/decisions/</code> file with a prediction and a metric — before
+        any code.
+      </p>
+      <CopySlip
+        command={terminal}
+        label="Install in your terminal"
+        note="Runs anywhere Node 18+ is installed. MIT licensed, no telemetry."
+      />
+    </div>
+  </section>
+
+  <!-- ============ 9. Contributing + improvements ============ -->
+  <section aria-labelledby="open">
+    <h2 id="open">Built in the open.</h2>
+    <p class="lead" style="margin-top: 1rem">
+      The protocol, the CLI, and the memory format are all in the repository.
+    </p>
+
+    <div class="contrib-grid" style="margin-top: 2.5rem">
+      <div class="contrib-card">
+        <h3>Contribute</h3>
+        <p>
+          SiftOS is MIT-licensed. The deterministic core, the skill definition, and the
+          workflows are open for review and improvement.
+        </p>
+        <a class="go" href={`${repo}/blob/main/CONTRIBUTING.md`}>
+          Read CONTRIBUTING
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M2 10 10 2m0 0H4m6 0v6" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </a>
+      </div>
+      <div class="contrib-card">
+        <h3>Request an improvement</h3>
+        <p>
+          A workflow missing from the protocol, or a decision format that should exist?
+          Open an issue — it becomes a decision record itself.
+        </p>
+        <a class="go" href={issues}>
+          Open an issue
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M2 10 10 2m0 0H4m6 0v6" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 10. Footer ============ -->
+  <hr class="double-rule" aria-hidden="true" />
+  <footer>
+    <div class="masthead masthead--footer">
+      <svg class="masthead-mark" width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" fill="none" stroke="#7f8698" stroke-width="1.5" />
+        <rect x="3" y="3" width="26" height="26" fill="none" stroke="#a9afbd" stroke-width="1" />
+        <rect x="12" y="14" width="8" height="4" fill="#9e2f22" />
+      </svg>
+      <span class="masthead-name">SiftOS</span>
+    </div>
+    <div class="footer-links">
+      <a href="/siftos/">Home</a>
+      <a href="/siftos/how-it-works/">How it works</a>
+      <a href={`${repo}/blob/main/README.md`}>README</a>
+      <a href={`${repo}/blob/main/docs/quickstart.md`}>Quickstart</a>
+      <a href={repo}>GitHub</a>
+      <a href={`${repo}/blob/main/LICENSE`}>MIT License</a>
+    </div>
+    <div class="folio">
+      <span>The ledger of record for product decisions</span>
+      <span class="tabular"><a href={issues}>Open an issue</a></span>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  .hero {
+    padding-top: clamp(2.5rem, 6vw, 4.5rem);
+  }
+
+</style>

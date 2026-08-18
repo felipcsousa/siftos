@@ -1,0 +1,88 @@
+---
+interface Props {
+  entryId?: string;
+  id: string;
+  date?: string;
+  title: string;
+  prediction: string;
+  metric: string;
+  outcome: string;
+  outcomeMeasured?: string;
+  status: 'decided' | 'measured';
+  active?: boolean;
+  weight?: 'full' | 'thin';
+  annotation?: string;
+}
+
+const {
+  entryId,
+  id,
+  date = '',
+  title,
+  prediction,
+  metric,
+  outcome,
+  outcomeMeasured,
+  status,
+  active = false,
+  weight = 'full',
+  annotation,
+} = Astro.props;
+---
+
+<article class="entry" id={entryId} data-measured={status === 'measured' ? 'true' : undefined}>
+  <header class="entry-head">
+    <span>{id}</span>
+    {date && <span class="tabular">{date}</span>}
+  </header>
+  <div class="entry-body">
+    <h3 class="entry-title">{title}</h3>
+    <dl class="entry-cols">
+      <div class="entry-col">
+        <dt>Prediction</dt>
+        <dd class="tabular">{prediction}</dd>
+        <span class:list={['weight', weight === 'thin' && 'thin']} aria-hidden="true"></span>
+      </div>
+      <div class="entry-col">
+        <dt>Metric</dt>
+        <dd class="tabular">{metric}</dd>
+      </div>
+      <div class="entry-col">
+        <dt>Outcome</dt>
+        <dd class="tabular">
+          <span class="outcome-awaiting">{outcome}</span>
+          {outcomeMeasured && <span class="outcome-measured">{outcomeMeasured}</span>}
+        </dd>
+      </div>
+    </dl>
+  </div>
+  <div class="entry-foot">
+    <span class:list={['stamp', active && 'stamp--active', 'stamp--post', 'stamp-decided']}>
+      Decided
+    </span>
+    {outcomeMeasured && (
+      <span class:list={['stamp', 'stamp--filled', 'stamp-measured']}>
+        Measured
+      </span>
+    )}
+    {annotation && <span class="annotation">{annotation}</span>}
+  </div>
+</article>
+
+<style>
+  .entry-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 1.25rem 1.1rem;
+  }
+
+  .annotation {
+    font-style: italic;
+    font-size: 0.875rem;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--rule);
+    padding-left: 0.75rem;
+  }
+</style>

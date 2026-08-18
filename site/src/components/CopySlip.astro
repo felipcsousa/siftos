@@ -1,0 +1,25 @@
+---
+interface Props {
+  command: string;
+  label: string;
+  note: string;
+  copyLabel?: string;
+}
+
+const { command, label, note, copyLabel = 'Copy' } = Astro.props;
+---
+
+<div class="slip">
+  <div class="slip-head">
+    <span>{label}</span>
+    <button class="copy-btn" type="button" data-copy={command} data-label={copyLabel}>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="5.5" y="5.5" width="9" height="9" rx="1" />
+        <path d="M10.5 5.5v-3a1 1 0 0 0-1-1h-8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3" />
+      </svg>
+      {copyLabel}
+    </button>
+  </div>
+  <pre class="slip-code"><code>{command}</code></pre>
+  <p class="slip-note">{note}</p>
+</div>
