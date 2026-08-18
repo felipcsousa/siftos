@@ -13,15 +13,14 @@ const dec0001 = `${repo}/blob/main/.product/decisions/DEC-0001-deterministic-cor
   title="How SiftOS works — the decision protocol"
   description="Four phases, twelve commands, one ledger. Start with context, decide consciously, ship through the gate, and keep the record healthy."
 >
-  <Masthead current="how-it-works" />
-
-  <div class="folio">
-    <span>The ledger of record for product decisions</span>
-    <span class="tabular">How it works</span>
-  </div>
-
   <!-- ============ 1. Core loop ============ -->
   <section class="hero" aria-label="How SiftOS works">
+    <Masthead current="how-it-works" />
+
+    <div class="folio">
+      <span>The ledger of record for product decisions</span>
+      <span class="tabular">How it works</span>
+    </div>
     <div class="hero-copy">
       <h1>How SiftOS works.</h1>
       <p class="lead">
@@ -388,7 +387,7 @@ If a sample PDR fails validation, stop and fix the core before adding more.</cod
   }
 
   .phase {
-    padding: 0 0 clamp(3.5rem, 8vw, 5.5rem);
+    padding: 0 0 clamp(3.5rem, 9vw, 6.5rem);
     border-bottom: 1px solid var(--rule);
   }
 
