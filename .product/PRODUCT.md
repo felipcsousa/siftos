@@ -10,7 +10,7 @@ Product Decision Intelligence for AI-native teams. A repository-native agent ski
 
 ## Primary customer
 
-Product managers and heads of product at AI-native teams already using coding agents (Codex, OpenCode). They decide to adopt; the installation is executed by an engineer via copy-paste (`npx siftos install` or an agent prompt). [Confirmed in design session 2026-08-17]
+Product managers and heads of product at AI-native teams already using coding agents (Codex, OpenCode). They decide to adopt; the installation is executed by an engineer via copy-paste (`npx @felipcsousa/siftos install` or an agent prompt). [Confirmed in design session 2026-08-17]
 
 ## Primary jobs to be done
 
@@ -32,7 +32,7 @@ Early. v0.2.0. npm publish not yet done — planned as part of the landing launc
 
 ## Current constraints
 
-- Not yet published to npm; `npx siftos install` fails today (404).
+- Published to npm as `@felipcsousa/siftos` (name `siftos` blocked by registry anti-squatting vs `sift`); install via `npx @felipcsousa/siftos install`.
 - No testimonials, customers, benchmarks, pricing or usage claims — must not be fabricated.
 - No analytics on the landing (v1 decision); success signals are GitHub stars and issues opened.
 - Landing copy must be written in English; all repo content (README, docs, quickstart) is English.

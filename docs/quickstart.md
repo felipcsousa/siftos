@@ -7,7 +7,7 @@ This guide walks you from zero to a validated bet — the same path used for
 ## 1. Install (1 min)
 
 ```bash
-npx siftos install
+npx @felipcsousa/siftos install
 ```
 
 Installs the canonical skill into `.agents/skills/siftos/` (shared by OpenCode

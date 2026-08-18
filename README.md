@@ -47,7 +47,7 @@ SiftOS does not replace human judgment. The human owns every decision.
 ## Quickstart
 
 ```bash
-npx siftos install
+npx @felipcsousa/siftos install
 siftos init
 ```
 
