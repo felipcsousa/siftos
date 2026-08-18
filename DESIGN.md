@@ -118,12 +118,12 @@ Warm ivory paper carrying near-black ink, blue-gray ruled hairlines, and a singl
 - **Command** (Fragment Mono, 0.9375rem, 1.6): Copyable commands in slips.
 
 ### Named Rules
-**The Tabular Rule.** Every figure — stats, predictions, outcomes, folio dates — uses `font-variant-numeric: tabular-nums`. Numbers align in columns like a ledger, never like prose.
+**The Tabular Rule.** Every figure — stats, predictions, outcomes, dates — uses `font-variant-numeric: tabular-nums`. Numbers align in columns like a ledger, never like prose.
 **The No-Eyebrow Rule.** Nothing sits above a heading as a label. The folio line is page furniture (top-right, tiny, mono), never a heading announcement.
 
 ## Layout
 
-Single column, max 1080px, 1.5rem gutters. Two pages: the landing (Persuade) and How it works (Read), sharing the masthead, folio furniture, footer, and the ledger grammar. The How-it-works page uses a two-column layout — a sticky folio index (13rem) beside the phase sections — collapsing to a single column and a wrapping index below 860px. Sections stack as folio entries, each closed by a 1px rule; vertical rhythm is `clamp(3.5rem, 9vw, 6.5rem)` between sections, with more space above a heading than below it. Three-column entry grids and the four-column loop collapse to 1fr at 860px; slip and contrib grids collapse at 620px. The hero is masthead → folio → headline → posting slips, in that order; the before/after proof pair and the entry live in the problem section.
+Single column, max 1080px, 1.5rem gutters. Two pages: the landing (Persuade) and How it works (Read), sharing the masthead, folio furniture, footer, and the ledger grammar. The How-it-works page uses a two-column layout — a sticky folio index (13rem) beside the phase sections — collapsing to a single column and a wrapping index below 860px. Sections stack as folio entries, each closed by a 1px rule; vertical rhythm is `clamp(3.5rem, 9vw, 6.5rem)` between sections, with more space above a heading than below it. Three-column entry grids and the four-column loop collapse to 1fr at 860px; slip and contrib grids collapse at 620px. The hero is masthead → folio → headline → posting slips, in that order; the before/after proof pair and the entry live in the problem section. The folio carries the page label (Home / How it works) instead of a year.
 
 ## Elevation & Depth
 

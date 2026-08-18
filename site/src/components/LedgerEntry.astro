@@ -17,7 +17,7 @@ interface Props {
 const {
   entryId,
   id,
-  date = 'FOLIO 2026',
+  date = '',
   title,
   prediction,
   metric,
@@ -33,7 +33,7 @@ const {
 <article class="entry" id={entryId} data-measured={status === 'measured' ? 'true' : undefined}>
   <header class="entry-head">
     <span>{id}</span>
-    <span class="tabular">{date}</span>
+    {date && <span class="tabular">{date}</span>}
   </header>
   <div class="entry-body">
     <h3 class="entry-title">{title}</h3>

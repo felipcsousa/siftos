@@ -31,7 +31,7 @@ const issues = `${repo}/issues/new/choose`;
 
     <div class="folio">
       <span>The ledger of record for product decisions</span>
-      <span class="tabular">Folio 2026</span>
+      <span class="tabular">Home</span>
     </div>
     <div class="hero-copy">
       <h1>Build knowing what to measure.</h1>
@@ -41,7 +41,7 @@ const issues = `${repo}/issues/new/choose`;
         what you measured. Versioned in your repository, not your vendor&rsquo;s cloud.
       </p>
       <p class="compat" aria-label="Compatible with">
-        Works with <strong>Codex</strong> · <strong>OpenCode</strong> · <strong>npm</strong>
+        Works with <strong>Codex</strong> · <strong>OpenCode</strong>
       </p>
     </div>
 
@@ -219,6 +219,11 @@ const issues = `${repo}/issues/new/choose`;
         <p>Inspect and change lifecycle automation.</p>
       </div>
     </div>
+    <p class="meta" style="margin-top: 1rem">
+      A <strong>Bet</strong> is a decision with a hypothesis and a metric you will
+      measure. <strong>Deterministic</strong> means the same inputs always give the same
+      verdict — no arguing with the gate.
+    </p>
   </section>
 
   <!-- ============ 5. Example PDR — the record on disk ============ -->
@@ -364,9 +369,9 @@ Observed result: unknown. Review: 2026-09-13.</code></pre>
     <div style="max-width: 640px; margin-top: 2.5rem">
       <p class="meta" style="margin: 0 0 1.25rem">
         Then ask your agent to run
-        <code>siftos init</code> and start your first record: it writes
-        <code>.product/decisions/DEC-0001.md</code> with a prediction and a metric —
-        before any code.
+        <code>siftos init</code> and start your first record: it writes a new
+        <code>.product/decisions/</code> file with a prediction and a metric — before
+        any code.
       </p>
       <CopySlip
         command={terminal}
@@ -434,7 +439,7 @@ Observed result: unknown. Review: 2026-09-13.</code></pre>
     </div>
     <div class="folio">
       <span>The ledger of record for product decisions</span>
-      <span class="tabular">Folio 2026 · <a href={issues}>Open an issue</a></span>
+      <span class="tabular"><a href={issues}>Open an issue</a></span>
     </div>
   </footer>
 </Layout>
