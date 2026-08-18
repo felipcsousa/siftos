@@ -1,6 +1,6 @@
 {
   "name": "@felipcsousa/siftos",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Product Decision Intelligence for AI-native teams. Repository-native agent skill + deterministic CLI. Your product memory belongs to your repository, not your AI vendor.",
   "type": "module",
   "license": "MIT",
