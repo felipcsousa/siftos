@@ -8,7 +8,7 @@ description: >-
   prioritization, diagnosis, Ship Gate, outcomes, decision history, audits,
   or hook configuration. Product memory lives in .product/ (Markdown + Git).
   Human owns the decision; automation is always user-chosen.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # SiftOS
@@ -46,9 +46,10 @@ memory.
 
 ## Workflows
 
-Product memory and explicit workflow semantics are portable across OpenCode
-and Codex. Automatic lifecycle interception is harness-specific; do not claim
-hook parity where the platform does not expose an equivalent lifecycle point.
+Product memory and explicit workflow semantics are portable across OpenCode,
+Codex and DeepSeek Harness (dsh). Automatic lifecycle interception is
+harness-specific; do not claim hook parity where the platform does not expose
+an equivalent lifecycle point.
 
 | Workflow | What it does |
 | --- | --- |
@@ -133,6 +134,15 @@ session lifecycle observation, compaction context, and advisory closeout at
 idle. OpenCode currently has no documented 1:1 contract for Codex-style
 UserPromptSubmit context injection or Stop continuation. Do not pretend those
 capabilities exist; surface degraded behavior when relevant.
+
+**DeepSeek Harness (dsh):** the home-installed Cordis plugin implements the
+documented dsh lifecycle contracts: `agent/session-start` context capsule (and
+again on `source: "compact"`), `agent/pre-step` prompt-submit intent intake,
+`tools/pre-execute` mutation gating via `{ kind: "deny", reason }`,
+`tools/result` footprint tracking, `agent/turn-stopping` closeout with exactly
+one `agent.steer` continuation, and `agent/disposed` cleanup. dsh is a
+developer-preview harness: plugin APIs may change; `siftos doctor` reports
+installed artifacts, not assumed runtime fire.
 
 Hooks never make canonical product memory disposable. `.product/.runtime/`
 contains only reconstructable session state.

@@ -191,12 +191,47 @@ function shellEffect(command) {
 export function classifyToolEffect(toolName, toolInput) {
   const tool = String(toolName ?? "").toLowerCase(); const values = toolStrings(toolInput); const joined = values.join(" ").toLowerCase();
   if (["read", "grep", "glob", "search", "show", "view", "cat", "ls", "list", "status", "audit", "context"].includes(tool)) return "read";
-  if (["write", "edit", "apply_patch", "apply", "patch", "multiedit", "rename", "insert", "delete"].includes(tool)) {
-    const internal = joined.includes(".product/") || joined.includes(".agents/skills/siftos/") || joined.includes(".siftos"); return internal ? "siftos_internal" : "mutation";
+  if (["write", "edit", "apply_patch", "apply", "patch", "multiedit", "rename", "insert", "delete", "str_replace_editor"].includes(tool)) {
+    // dsh's str_replace_editor is a command enum: `view` reads (file/dir
+    // listing), only create/str_replace/insert mutate.
+    if (tool === "str_replace_editor" && String(toolInput?.command ?? "").toLowerCase() === "view") return "read";
+    // Internal detection keys off real path fields only: old/new string or
+    // file bodies that merely mention `.product/` must never bypass Guard.
+    const pathValues = (tool === "apply_patch" || tool === "patch" ? [...pathFieldValues(toolInput), ...applyPatchPaths(toolInput)] : pathFieldValues(toolInput)).join(" ").toLowerCase();
+    const internal = pathValues.includes(".product/") || pathValues.includes(".agents/skills/siftos/") || pathValues.includes(".siftos"); return internal ? "siftos_internal" : "mutation";
   }
-  if (["bash", "shell", "exec"].includes(tool)) return shellEffect(values[0] ?? joined); return "unknown";
+  if (["bash", "shell", "exec", "pwsh"].includes(tool)) return shellEffect(values[0] ?? joined); return "unknown";
 }
 function pathLike(value) { return /[\\/]|\.[A-Za-z0-9]{1,8}(?:\s|$)/.test(value); }
+const PATH_KEYS = ["path", "file_path", "old_path", "new_path", "target", "file"];
+function pathFieldValues(toolInput) {
+  // Recursive: multiedit nests file_path under edits[], and other tools may
+  // nest paths arbitrarily. Only strings under a PATH_KEY are collected, so
+  // old/new string or file bodies never leak into internal detection.
+  const out = [];
+  const walk = (value) => {
+    if (typeof value === "string") return;
+    if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+    if (value && typeof value === "object") {
+      for (const [key, item] of Object.entries(value)) {
+        if (PATH_KEYS.includes(key) && typeof item === "string") out.push(item);
+        else walk(item);
+      }
+    }
+  };
+  walk(toolInput);
+  return out;
+}
+// apply_patch/patch encode target paths only in `*** Update|Add|Delete File:`
+// headers inside the patch body; parse those lines for internal detection.
+function applyPatchPaths(toolInput) {
+  const out = [];
+  const header = /^\*{3} (?:Update|Add|Delete) File: (.+)$/gm;
+  for (const value of toolStrings(toolInput)) {
+    for (const match of String(value).matchAll(header)) out.push((match[1] ?? "").trim());
+  }
+  return out;
+}
 function nonProductTarget(value) { const normalized = String(value).replace(/\\/g, "/").toLowerCase(); return NON_PRODUCT_PATHS.some((pattern) => pattern.test(normalized)); }
 export function classifyLevel(state, toolName, toolInput) {
   const values = toolStrings(toolInput); const targets = values.filter(pathLike);
@@ -237,7 +272,7 @@ export function beforeMutation(root, { toolName, toolInput }) {
 function mutationPaths(toolName, toolInput) {
   const tool = String(toolName ?? "").toLowerCase();
   const values = toolStrings(toolInput);
-  const tokens = ["bash", "shell", "exec"].includes(tool)
+  const tokens = ["bash", "shell", "exec", "pwsh"].includes(tool)
     ? values.flatMap((value) => String(value).split(/\s+/))
     : values;
   return tokens.filter((value) => /[\\/]|\.[A-Za-z0-9]{1,8}$/.test(value));

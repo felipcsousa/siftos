@@ -53,7 +53,7 @@ function main() {
         {
           version: 2,
           name: "siftos",
-          platforms: ["opencode", "codex"],
+          platforms: ["opencode", "codex", "dsh"],
           linters: { enabled: true },
         },
         null,

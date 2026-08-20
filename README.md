@@ -2,9 +2,10 @@
 
 **Product Decision Intelligence for AI-native teams.**
 
-SiftOS is a repository-native agent skill for OpenCode and Codex that gives
-agents persistent product context and a structured decision protocol — shape,
-decide, validate, challenge, build, review and learn.
+SiftOS is a repository-native agent skill for OpenCode, Codex and DeepSeek
+Harness (dsh) that gives agents persistent product context and a structured
+decision protocol — shape, decide, validate, challenge, build, review and
+learn.
 
 > **Your product memory belongs to your repository, not your AI vendor.**
 
@@ -29,7 +30,8 @@ Decision → Prediction → Outcome → Learning ↺
 ## What SiftOS is
 
 - **A canonical agent skill** in `.agents/skills/siftos/`. Product memory and
-  explicit workflows are shared across OpenCode and Codex without migration.
+  explicit workflows are shared across OpenCode, Codex and dsh without
+  migration.
 - **Product Decision Records (PDRs)** — versioned, human-readable and
   agent-readable Markdown.
 - **Product workflows** — `init`, `decide`, `shape`, `validate`, `challenge`,
@@ -195,18 +197,18 @@ same policy data and are covered by parity evals.
 
 ### Harness capability matrix
 
-Product memory and explicit skills are shared across both harnesses. Automatic
-lifecycle integration is intentionally reported by actual capability rather
-than claimed as perfect parity.
+Product memory and explicit skills are shared across all supported harnesses.
+Automatic lifecycle integration is intentionally reported by actual capability
+rather than claimed as perfect parity.
 
-| Capability | Codex | OpenCode |
-| --- | --- | --- |
-| Shared `.agents/skills/siftos` workflows | Yes | Yes |
-| Before/after mutation guard | Native hook adapter | Native plugin hook |
-| Session lifecycle observation | Yes | Yes |
-| Compaction preservation | `PreCompact` + session context | compaction plugin hook |
-| Prompt-submit context injection | Native `UserPromptSubmit` | No documented 1:1 equivalent; degraded |
-| Stop-style forced closeout continuation | Native `Stop` | No documented 1:1 equivalent; advisory at idle |
+| Capability | Codex | OpenCode | dsh |
+| --- | --- | --- | --- |
+| Shared `.agents/skills/siftos` workflows | Yes | Yes | Yes (native rank 200) |
+| Before/after mutation guard | Native hook adapter | Native plugin hook | `tools/pre-execute` + `tools/result` |
+| Session lifecycle observation | Yes | Yes | `agent/session-start` / `agent/disposed` |
+| Compaction preservation | `PreCompact` + session context | compaction plugin hook | `agent/session-start` source `compact` + capsule inject |
+| Prompt-submit context injection | Native `UserPromptSubmit` | No documented 1:1 equivalent; degraded | `agent/pre-step` (native) |
+| Stop-style forced closeout continuation | Native `Stop` | No documented 1:1 equivalent; advisory at idle | `agent/turn-stopping` + `agent.steer` (native, capped at one) |
 
 Codex uses the harness JSON contracts for context injection,
 `PreToolUse.permissionDecision`, and `Stop` continuation. OpenCode installs a
@@ -222,6 +224,14 @@ capability.
 `.codex/hooks.json`, refuses to overwrite an unrelated
 `.opencode/plugins/siftos.js`, and replaces its own skill directory on reinstall
 so removed package files do not survive as stale artifacts.
+
+dsh installs a home-level Cordis plugin (`$DSH_HOME/plugins/siftos` + a marked
+`cordis.patch.yml` insert row) whose documented contracts are
+`tools/pre-execute` mutation gating, `tools/result` tracking,
+`agent/pre-step` prompt intake, and `agent/turn-stopping` closeout with exactly
+one `agent.steer` continuation. dsh is developer-preview; when plugin APIs
+change, `siftos doctor` keeps reporting the installed artifacts honestly
+instead of assuming runtime fire.
 
 ## Ship Gate
 

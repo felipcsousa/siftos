@@ -122,9 +122,11 @@ examples of the full pattern.
 ## How to change the skill behavior
 
 `SKILL.md` stays lean — protocols live in `skill/references/`. Behavior
-changes must keep behavioral parity between harnesses (OpenCode and
-Codex): same semantics, style differences allowed, structural differences
-are bugs. Deterministic workflows stay script-driven; the model only
+changes must keep behavioral parity between harnesses (OpenCode, Codex,
+and dsh): same semantics, style differences allowed, structural harness
+differences are allowed only where the harness lacks the lifecycle point and
+must be documented as degraded. Deterministic workflows stay script-driven;
+the model only
 adds interpretation and analysis.
 
 ## Development workflow

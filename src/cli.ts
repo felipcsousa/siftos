@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,7 +122,7 @@ function skillSourceDir(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 function defaultConfigObject(): SiftosConfig {
-  return { version: 2, name: "siftos", platforms: ["opencode", "codex"], linters: { enabled: true } };
+  return { version: 2, name: "siftos", platforms: ["opencode", "codex", "dsh"], linters: { enabled: true } };
 }
 function loadGlobalPreset(): HookPreset | null {
   try {
@@ -244,9 +244,53 @@ async function cmdInstall(flags: Record<string, string | boolean>): Promise<numb
   }
   writeFileAtomic(openCodePlugins, "siftos.js", `// Installed by SiftOS. Canonical implementation lives with the agent skill.\nexport { SiftOSPlugin, default } from "../../.agents/skills/siftos/adapters/opencode-plugin.js";\n`);
 
+  const dshHome = dshHomeDir();
+  const dshPluginDir = path.join(dshHome, "plugins", "siftos");
+  const dshScriptsDir = path.join(dshPluginDir, "scripts");
+  mkdirSync(dshScriptsDir, { recursive: true });
+  // Cordis loads plugins/siftos/index.js; rewrite the repo-relative import so
+  // the deployed entry resolves hook-lib next to itself.
+  const dshEntry = readFileSync(path.join(source, "adapters", "dsh-plugin.js"), "utf8")
+    .replace('"../scripts/hook-lib.mjs"', '"./scripts/hook-lib.mjs"');
+  writeFileAtomic(dshPluginDir, "index.js", dshEntry);
+  for (const file of ["hook-lib.mjs", "lib.mjs", "policy.json"]) {
+    copyFileSync(path.join(source, "scripts", file), path.join(dshScriptsDir, file));
+  }
+  const patchPath = path.join(dshHome, "cordis.patch.yml");
+  const siftosBlock = dshSiftosBlock();
+  let patch = "";
+  if (existsSync(patchPath)) patch = readFileSync(patchPath, "utf8");
+  const begin = patch.indexOf(DSH_BEGIN);
+  const end = patch.indexOf(DSH_END);
+  let changed = true;
+  if (begin !== -1 && end !== -1 && end >= begin) {
+    // Marker-managed SiftOS blocks are always replaceable.
+    patch = patch.slice(0, begin) + siftosBlock + patch.slice(end + DSH_END.length);
+  } else if (begin !== -1 || end !== -1) {
+    console.error(`error: ${patchPath} contains an unbalanced SiftOS marker; refusing to modify it`);
+    return 1;
+  } else {
+    // Row-level check, not a substring scan: a comment or config value that
+    // merely mentions `id: siftos` must not be mistaken for a plugin row.
+    const rowExists = patch.split(/\r?\n/).some((line) => /^[ \t]*-?[ \t]*id:[ \t]*siftos[ \t]*$/.test(line));
+    if (!rowExists) {
+      patch = patch.replace(/\s+$/, "") + (patch ? "\n\n" : "") + siftosBlock;
+    } else if (!dshManagedRow(patch)) {
+      console.error(`error: ${patchPath} already defines id: ${DSH_INSERT_ID} with a different plugin path; refusing to overwrite user configuration`);
+      return 1;
+    } else {
+      // A manual SiftOS row already exists without markers: leave the file
+      // untouched instead of appending a duplicate row (doctor accepts
+      // id: siftos + the SiftOS path without markers).
+      changed = false;
+    }
+  }
+  if (changed) writeFileAtomic(dshHome, "cordis.patch.yml", patch);
+
   console.log(`${CHECK} SiftOS skill installed`);
   console.log(`${CHECK} Codex lifecycle adapter installed (existing non-SiftOS hooks preserved)`);
   console.log(`${CHECK} OpenCode plugin adapter installed`);
+  console.log(`${CHECK} DeepSeek Harness (dsh) lifecycle adapter installed`);
   console.log("");
   console.log("Automation remains OFF until explicitly enabled with:");
   console.log("  siftos hooks set advisory | balanced | strict");
@@ -281,6 +325,42 @@ function openCodeAdapterInstalled(root: string): boolean {
 const CODEX_HOOKS = new Set<HookName>(["session_start", "prompt_submit", "before_mutation", "after_mutation", "turn_stop", "context_compact", "session_end"]);
 const OPENCODE_HOOKS = new Set<HookName>(["session_start", "before_mutation", "after_mutation", "turn_stop", "context_compact", "session_end"]);
 
+const DSH_HOME_ENV = "DSH_HOME";
+const DSH_HOME_DIR_NAME = ".dsh";
+const DSH_BEGIN = "# BEGIN Siftos";
+const DSH_END = "# END Siftos";
+const DSH_INSERT_ID = "siftos";
+const DSH_INSERT_NAME = "./plugins/siftos/index.js";
+const DSH_HOOKS = new Set<HookName>(["session_start", "prompt_submit", "before_mutation", "after_mutation", "turn_stop", "context_compact", "session_end"]);
+
+/** dsh's home rule: $DSH_HOME, else ~/.dsh (same precedence as resolveDshHome). */
+function dshHomeDir(): string {
+  return process.env[DSH_HOME_ENV]?.trim() || path.join(os.homedir(), DSH_HOME_DIR_NAME);
+}
+function dshSiftosBlock(): string {
+  return `${DSH_BEGIN}\n- insert:\n    - id: ${DSH_INSERT_ID}\n      name: '${DSH_INSERT_NAME}'\n${DSH_END}\n`;
+}
+/**
+ * True when the patch contains a real plugin row `id: siftos` whose name is
+ * the SiftOS path. Row-level, so comments or config values that merely
+ * mention the id, markers, or path never count as an installed adapter.
+ */
+function dshManagedRow(content: string): boolean {
+  const lines = content.split(/\r?\n/);
+  const rowIndex = lines.findIndex((line) => /^[ \t]*-?[ \t]*id:[ \t]*siftos[ \t]*$/.test(line));
+  if (rowIndex === -1) return false;
+  const nextLine = lines[rowIndex + 1] ?? "";
+  return /^[ \t]*name:[ \t]*['"]?\.\/plugins\/siftos\/index\.js['"]?/.test(nextLine);
+}
+function dshAdapterInstalled(dshHome: string): boolean {
+  const entry = path.join(dshHome, "plugins", "siftos", "index.js");
+  const patch = path.join(dshHome, "cordis.patch.yml");
+  if (!existsSync(entry) || !existsSync(patch)) return false;
+  try {
+    return dshManagedRow(readFileSync(patch, "utf8"));
+  } catch { return false; }
+}
+
 function doctor(cwd: string) {
   const root = findRepoRoot(cwd);
   const result = {
@@ -289,6 +369,7 @@ function doctor(cwd: string) {
     decisionSchemaValid: false, configValid: false,
     openCodeSkillCompatible: false, openCodeAdapterInstalled: false,
     codexSkillCompatible: false, codexAdapterInstalled: false,
+    dshSkillCompatible: false, dshAdapterInstalled: false,
     automationPreset: "not-chosen", automationHealth: "off",
     hooks: [] as Array<{ hook: HookName; label: string; installed: boolean; enabled: boolean; observed: boolean }>,
     healthy: false,
@@ -299,6 +380,8 @@ function doctor(cwd: string) {
   result.codexSkillCompatible = result.skillInstalled;
   result.openCodeAdapterInstalled = openCodeAdapterInstalled(root);
   result.codexAdapterInstalled = codexAdapterInstalled(root);
+  result.dshSkillCompatible = result.skillInstalled;
+  result.dshAdapterInstalled = dshAdapterInstalled(dshHomeDir());
 
   const repo = new ProductRepository(root);
   result.productDir = repo.initialized;
@@ -313,7 +396,7 @@ function doctor(cwd: string) {
   result.configValid = resolved.config !== null && resolved.hooksValid;
   result.automationPreset = resolved.config?.hooks === undefined ? "not-chosen" : resolved.effective.preset;
   for (const name of HOOK_NAMES) {
-    const installed = (result.codexAdapterInstalled && CODEX_HOOKS.has(name)) || (result.openCodeAdapterInstalled && OPENCODE_HOOKS.has(name));
+    const installed = (result.codexAdapterInstalled && CODEX_HOOKS.has(name)) || (result.openCodeAdapterInstalled && OPENCODE_HOOKS.has(name)) || (result.dshAdapterInstalled && DSH_HOOKS.has(name));
     result.hooks.push({ hook: name, label: HOOK_LABELS[name], installed, enabled: resolved.effective.hooks[name].enabled, observed: resolved.session.heartbeat[name] !== undefined });
   }
   const anyEnabled = result.hooks.some((hook) => hook.enabled);
@@ -336,7 +419,9 @@ function formatDoctor(result: ReturnType<typeof doctor>): string {
     `OpenCode skill             ${flag(result.openCodeSkillCompatible)}`,
     `OpenCode hook plugin       ${flag(result.openCodeAdapterInstalled)}`,
     `Codex skill                ${flag(result.codexSkillCompatible)}`,
-    `Codex hook adapter         ${flag(result.codexAdapterInstalled)}`, "",
+    `Codex hook adapter         ${flag(result.codexAdapterInstalled)}`,
+    `DeepSeek Harness skill     ${flag(result.dshSkillCompatible)}`,
+    `DeepSeek Harness hook plugin ${flag(result.dshAdapterInstalled)}`, "",
     `Decision schema            ${flag(result.decisionSchemaValid)}`,
     `Configuration              ${flag(result.configValid)}`, "",
     `Automation: ${result.automationPreset.toUpperCase()} (${result.automationHealth})`, "",
