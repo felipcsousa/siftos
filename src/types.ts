@@ -108,14 +108,14 @@ export interface ProductContext {
 export interface SiftosConfig {
   version: number;
   name: "siftos";
-  platforms: Array<"opencode" | "codex">;
+  platforms: Array<"opencode" | "codex" | "dsh">;
   linters: { enabled: boolean };
   /** Raw `hooks` block (PRD V2 §13). Absent = not chosen = hooks off. */
   hooks?: unknown;
 }
 
 export interface PlatformCapabilities {
-  platform: "opencode" | "codex";
+  platform: "opencode" | "codex" | "dsh";
   canReadFiles: boolean;
   canWriteFiles: boolean;
   canRunScripts: boolean;
@@ -125,7 +125,7 @@ export interface PlatformCapabilities {
 }
 
 export interface CompatibilityResult {
-  platform: "opencode" | "codex";
+  platform: "opencode" | "codex" | "dsh";
   ok: boolean;
   notes: string[];
 }

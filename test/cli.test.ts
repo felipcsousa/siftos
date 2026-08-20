@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tsxLoader = createRequire(import.meta.url).resolve("tsx");
 
 function runCli(args: string[], cwd: string): { code: number; stdout: string; stderr: string } {
-  const env = { ...process.env, HOME: cwd, SIFTOS_TODAY: "2026-08-13" };
+  const env = { ...process.env, HOME: cwd, DSH_HOME: path.join(cwd, ".dsh"), SIFTOS_TODAY: "2026-08-13" };
   try {
     const stdout = execFileSync(process.execPath, ["--import", tsxLoader, path.join(root, "src", "cli.ts"), ...args], {
       cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
@@ -178,8 +178,69 @@ describe("siftos CLI", () => {
     expect(existsSync(path.join(tmp, ".agents", "skills", "siftos", "references", "linter-rules.md"))).toBe(true);
     expect(existsSync(path.join(tmp, ".agents", "skills", "siftos", "scripts", "validate.mjs"))).toBe(true);
     expect(existsSync(path.join(tmp, ".opencode", "plugins", "siftos.js"))).toBe(true);
+    expect(existsSync(path.join(tmp, ".dsh", "plugins", "siftos", "index.js"))).toBe(true);
+    expect(existsSync(path.join(tmp, ".dsh", "plugins", "siftos", "scripts", "hook-lib.mjs"))).toBe(true);
+    expect(existsSync(path.join(tmp, ".dsh", "plugins", "siftos", "scripts", "lib.mjs"))).toBe(true);
+    expect(existsSync(path.join(tmp, ".dsh", "plugins", "siftos", "scripts", "policy.json"))).toBe(true);
+    const patch = readFileSync(path.join(tmp, ".dsh", "cordis.patch.yml"), "utf8");
+    expect(patch).toContain("BEGIN Siftos");
+    expect(patch).toContain("./plugins/siftos/index.js");
+    const deployed = readFileSync(path.join(tmp, ".dsh", "plugins", "siftos", "index.js"), "utf8");
+    expect(deployed).toContain('"./scripts/hook-lib.mjs"');
+    expect(deployed).not.toContain('"../scripts/hook-lib.mjs"');
     const doctor = runCli(["doctor"], tmp);
     expect(doctor.stdout).toContain("Skill installed            ✓");
+    expect(doctor.stdout).toContain("DeepSeek Harness skill     ✓");
+    expect(doctor.stdout).toContain("DeepSeek Harness hook plugin ✓");
     expect(doctor.stdout).toContain("Status: unhealthy");
+  });
+
+  it("install preserves unrelated cordis.patch.yml rows and never duplicates the SiftOS block", () => {
+    const fresh = mkdtempSync(path.join(os.tmpdir(), "siftos-dsh-patch-")); mkdirSync(path.join(fresh, ".git"));
+    const dshHome = path.join(fresh, ".dsh"); mkdirSync(dshHome, { recursive: true });
+    writeFileSync(path.join(dshHome, "cordis.patch.yml"), "- insert:\n    - id: timer\n      name: '@deepseek-ai/cordis-plugin-timer'\n");
+    expect(runCli(["install"], fresh).code).toBe(0);
+    const first = readFileSync(path.join(dshHome, "cordis.patch.yml"), "utf8");
+    expect(first).toContain("id: timer");
+    expect(first).toContain("BEGIN Siftos");
+    expect(runCli(["install"], fresh).code).toBe(0);
+    const second = readFileSync(path.join(dshHome, "cordis.patch.yml"), "utf8");
+    expect(second).toContain("id: timer");
+    expect(second.match(/BEGIN Siftos/g)?.length).toBe(1);
+    expect(second.match(/id: siftos/g)?.length).toBe(1);
+    rmSync(fresh, { recursive: true, force: true });
+  });
+
+  it("install leaves a manual SiftOS row without markers untouched (no duplicate)", () => {
+    const fresh = mkdtempSync(path.join(os.tmpdir(), "siftos-dsh-manual-")); mkdirSync(path.join(fresh, ".git"));
+    const dshHome = path.join(fresh, ".dsh"); mkdirSync(dshHome, { recursive: true });
+    const original = "- insert:\n    - id: siftos\n      name: './plugins/siftos/index.js'\n";
+    writeFileSync(path.join(dshHome, "cordis.patch.yml"), original);
+    expect(runCli(["install"], fresh).code).toBe(0);
+    expect(readFileSync(path.join(dshHome, "cordis.patch.yml"), "utf8")).toBe(original);
+    rmSync(fresh, { recursive: true, force: true });
+  });
+
+  it("doctor does not report the dsh adapter from comments or marker shells", () => {
+    const fresh = mkdtempSync(path.join(os.tmpdir(), "siftos-dsh-shell-")); mkdirSync(path.join(fresh, ".git"));
+    const dshHome = path.join(fresh, ".dsh");
+    mkdirSync(path.join(dshHome, "plugins", "siftos"), { recursive: true });
+    writeFileSync(path.join(dshHome, "plugins", "siftos", "index.js"), "// placeholder\n");
+    writeFileSync(path.join(dshHome, "cordis.patch.yml"), "# BEGIN Siftos\n# - insert:\n#     - id: siftos\n#       name: './plugins/siftos/index.js'\n# END Siftos\n");
+    const doctor = runCli(["doctor"], fresh);
+    expect(doctor.stdout).toContain("DeepSeek Harness hook plugin ✗");
+    rmSync(fresh, { recursive: true, force: true });
+  });
+
+  it("install refuses an unmanaged id: siftos in cordis.patch.yml and leaves the file intact", () => {
+    const fresh = mkdtempSync(path.join(os.tmpdir(), "siftos-dsh-unmanaged-")); mkdirSync(path.join(fresh, ".git"));
+    const dshHome = path.join(fresh, ".dsh"); mkdirSync(dshHome, { recursive: true });
+    const original = "- insert:\n    - id: siftos\n      name: './elsewhere/plugin.js'\n";
+    writeFileSync(path.join(dshHome, "cordis.patch.yml"), original);
+    const result = runCli(["install"], fresh);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("refusing to overwrite user configuration");
+    expect(readFileSync(path.join(dshHome, "cordis.patch.yml"), "utf8")).toBe(original);
+    rmSync(fresh, { recursive: true, force: true });
   });
 });

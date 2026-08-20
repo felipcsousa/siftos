@@ -130,6 +130,33 @@ may derive a Bet only when exactly one PDR is `building`. If no unique Bet can
 be attached, it reports that implementation mutations occurred without a
 unique active Bet instead of pretending a Ship Gate ran.
 
+## DeepSeek Harness (dsh)
+
+`siftos install` writes a Cordis plugin into the harness home:
+
+```text
+$DSH_HOME/plugins/siftos/index.js        (plus scripts/ runtime)
+$DSH_HOME/cordis.patch.yml               marked SiftOS insert row
+```
+
+Home default is `$DSH_HOME` or `~/.dsh`. The patch inserts the plugin row
+`id: siftos` → `./plugins/siftos/index.js`; marker-managed SiftOS blocks are
+replaced on reinstall, unrelated YAML is preserved, and an unmanaged
+`id: siftos` pointing elsewhere is refused.
+
+| SiftOS behavior | dsh event | Behavior |
+| --- | --- | --- |
+| Session context | `agent/session-start` (emit) | `startSession`; capsule injected while `session_start` is enabled; `source: "compact"` observes `context_compact` and injects the capsule again |
+| Prompt intake | `agent/pre-step` (waterfall) | starts a fresh intent from the message batch; always `next()` — Guard never rejects steps |
+| Mutation gate | `tools/pre-execute` (waterfall) | `{ kind: "deny", reason }` while unresolved; `fail_closed` on errors |
+| Mutation tracking | `tools/result` (emit) | records actual mutation effects only |
+| Closeout | `agent/turn-stopping` (serial) | balanced/strict may `agent.steer` exactly one continuation; otherwise advisory `inject` |
+| Cleanup | `agent/disposed` (emit) | clears session-only state |
+
+dsh is a developer-preview harness; plugin event contracts may change without
+notice. Doctor reports the installed artifacts (plugin file + patch row), not
+assumed runtime fire — `Observed` still requires a real hook firing.
+
 ## Presets
 
 Guard behavior:
