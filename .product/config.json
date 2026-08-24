@@ -1,9 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "siftos",
   "platforms": [
     "opencode",
-    "codex"
+    "codex",
+    "dsh"
   ],
   "linters": {
     "enabled": true

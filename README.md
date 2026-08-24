@@ -267,6 +267,7 @@ siftos search <query>
 siftos next-id
 siftos show <DEC-XXXX>
 siftos context [<query>]
+siftos status
 siftos hooks
 siftos hook enable|disable <hook>
 siftos ship <DEC-XXXX>
@@ -276,6 +277,17 @@ siftos scope <DEC-XXXX> <path...>
 siftos doctor
 siftos version
 ```
+
+For local development, link the CLI so `siftos` is on `PATH` (run from the
+repository root): `npm link`. If `siftos` is not found, run it directly via
+the compiled entry point: `node dist/entry.js <command>`. Run `npm run build`
+after source changes before using the CLI.
+
+### `siftos status`
+
+Lists decisions grouped by lifecycle status and flags overdue reviews
+for active decisions (accepted/building/shipped/measuring with a
+`review_date` in the past).
 
 Set `SIFTOS_TODAY=YYYY-MM-DD` to pin time-dependent checks in deterministic
 tests.

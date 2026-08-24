@@ -33,7 +33,7 @@ function main() {
     console.log("");
   }
 
-  const open = decisions.filter((d) => ["accepted", "shipped"].includes(d.status));
+  const open = decisions.filter((d) => ["accepted", "building", "shipped", "measuring"].includes(d.status));
   const pending = open.filter((d) => d.reviewDate && d.reviewDate < now);
   if (pending.length > 0) {
     console.log("Pending review:");
