@@ -1,9 +1,9 @@
 ---
 id: DEC-0001
 title: Ship deterministic CLI before agent workflows
-status: accepted
+status: reviewed
 created_at: 2026-08-13
-updated_at: 2026-08-13
+updated_at: 2026-08-21
 owner: siftos-team
 tags:
   - cli
@@ -71,7 +71,7 @@ Proceed with option B: verify the deterministic CLI locally, then exercise the a
 
 ## Final Human Decision
 
-Pending. Proposed for local testing.
+Confirmed by action and review on 2026-08-21: option B (deterministic CLI first) was executed and shipped; the human confirmed the record during the review.
 
 ## Rationale
 
@@ -112,32 +112,45 @@ Revisit after the first OpenCode decide workflow runs on this machine.
 
 ## Observed Result
 
-Unknown.
+- Lifecycle path: accepted (2026-08-13) → shipped → reviewed (2026-08-21); shipped is evidenced by the Final Human Decision ("executed and shipped") — recorded here because the memory stores only the current status.
+- 3 sample decisions parse, validate and appear in audit (validate: 3 OK; audit: 3 records, 0 missing metrics, 0 missing alternatives) — primary metric exceeded its "number of sample decisions" framing.
+- CLI exercised end-to-end this session via `node dist/entry.js` (validate, audit, roadmap, next-id, status).
+- Caveat: `siftos` is not on PATH in the current shell (`which siftos` fails) — the npm link present on 2026-08-13 is not available in this environment; the CLI works via the dist entry point.
 
 ## Prediction Accuracy
 
-Unknown.
+Expected: "Local install is healthy, sample decisions validate, and the audit report reflects real content."
+Actual: local install healthy with the dist-entry caveat above; 3/3 sample decisions validate; audit reflects real content.
+Assessment: within expected range, with one environment caveat (PATH/link).
 
 ## Unexpected Effects
 
-Unknown.
+- The local npm link from 2026-08-13 is not present in the current shell environment.
+- The revisit condition ("first OpenCode decide workflow runs on this machine") was satisfiable via the in-harness workflow (DEC-0003, 2026-08-21) rather than OpenCode specifically.
 
 ## Assumptions Confirmed
 
-Unknown.
+- The deterministic core is the right foundation: everything shipped on top (dsh adapter, npm publish, landing, this session's workflows) produced zero core defects.
+- "Local environment matches CI for Node 18+" — partially confirmed: local suite green per record; CI not re-verified in this session.
 
 ## Assumptions Invalidated
 
-Unknown.
+None observed.
 
 ## Decision Assessment
 
-Unknown.
+Good decision / good outcome (sequencing-level outcome measured; adoption outcome still pending in DEC-0002).
 
 ## Learnings
 
-Unknown.
+Candidate learning:
+Observation: sequencing the deterministic core first produced zero core defects across publish, adapter and landing work.
+Interpretation: foundational determinism makes downstream failures attributable to the workflow, not the storage layer.
+Updated belief: for a product whose promise is "memory is canonical", the deterministic core is the trust anchor and was the right first build.
+Implication: keep core determinism as a messaging anchor; document local CLI usage (npm link / node dist/entry.js) in the README.
+Next hypothesis: users will attribute validation failures to workflows, not storage — test via issues.
 
 ## Follow-up Decisions
 
-Unknown.
+- DEC-0002 — Launch SiftOS publicly and measure adoption (2026-08-21).
+- DEC-0003 — Focus next two weeks on content-driven distribution (2026-08-21).
