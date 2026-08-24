@@ -6,11 +6,11 @@ SiftOS
 
 ## Description
 
-Product Decision Intelligence for AI-native teams. A repository-native agent skill for OpenCode and Codex, plus a deterministic CLI, that gives agents persistent product context and a structured decision protocol — shape, decide, validate, challenge, build, review and learn. Product memory lives in the repository (`.product/`), not with the AI vendor.
+Product Decision Intelligence for AI-native teams. A repository-native agent skill for OpenCode, Codex and DeepSeek Harness (dsh), plus a deterministic CLI, that gives agents persistent product context and a structured decision protocol — shape, decide, validate, challenge, build, review and learn. Product memory lives in the repository (`.product/`), not with the AI vendor.
 
 ## Primary customer
 
-Product managers and heads of product at AI-native teams already using coding agents (Codex, OpenCode). They decide to adopt; the installation is executed by an engineer via copy-paste (`npx @felipcsousa/siftos install` or an agent prompt). [Confirmed in design session 2026-08-17]
+Product managers and heads of product at AI-native teams already using coding agents (Codex, OpenCode, dsh). They decide to adopt; the installation is executed by an engineer via copy-paste (`npx @felipcsousa/siftos install` or an agent prompt). [Confirmed in design session 2026-08-17]
 
 ## Primary jobs to be done
 
@@ -20,11 +20,11 @@ Product managers and heads of product at AI-native teams already using coding ag
 
 ## Business model
 
-Open source (MIT). Distributed via npm (`siftos` package, publish pending). No pricing, no sales motion, no paid tiers.
+Open source (MIT). Distributed via npm (`@felipcsousa/siftos`, published 2026-08-18). No pricing, no sales motion, no paid tiers.
 
 ## Product stage
 
-Early. v0.2.0. npm publish not yet done — planned as part of the landing launch. Product memory was placeholder ("Unknown.") until this session.
+Early. v0.3.0. Published to npm as `@felipcsousa/siftos` (2026-08-18); landing built in `site/` with GitHub Pages workflow configured. Product memory was placeholder ("Unknown.") until this session.
 
 ## Positioning
 
@@ -46,7 +46,7 @@ Early. v0.2.0. npm publish not yet done — planned as part of the landing launc
 
 ## Relevant systems
 
-- OpenCode and Codex agent skills (`.agents/skills/siftos/`)
+- OpenCode, Codex and DeepSeek Harness (dsh) adapters (`.agents/skills/siftos/adapters/`)
 - npm registry (target distribution channel)
 - GitHub: felipcsousa/siftos repo; GitHub Pages project site (`felipcsousa.github.io/siftos`, base `/siftos/`) via Astro static export
 - `.product/` memory layout (PRODUCT/STRATEGY/METRICS/PRINCIPLES/ROADMAP, decisions/, evidence/)
