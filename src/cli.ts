@@ -36,6 +36,7 @@ import {
   type GuardResolution,
 } from "./guard.js";
 import { detectScopeDrift } from "./hooks.js";
+import { STATUS_ORDER } from "./status.js";
 import { searchDecisions } from "./search.js";
 import type { SiftosConfig } from "./types.js";
 
@@ -45,7 +46,7 @@ const CROSS = "✗";
 
 const COMMANDS = [
   "install", "init", "validate", "audit", "search", "next-id", "show", "context",
-  "doctor", "hooks", "hook", "ship", "roadmap", "guard", "scope", "version", "help",
+  "doctor", "hooks", "hook", "status", "ship", "roadmap", "guard", "scope", "version", "help",
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -611,6 +612,39 @@ async function cmdRoadmap(args: Args): Promise<number> {
   return 0;
 }
 
+async function cmdStatus(args: Args): Promise<number> {
+  const repo = tryOpenRepo(args.flags);
+  if (!repo?.initialized) return 1;
+  const now = todayOrEnv();
+  const decisions = repo.listDecisions();
+  const groups = new Map<string, typeof decisions>();
+  for (const status of STATUS_ORDER) groups.set(status, []);
+  for (const decision of decisions) groups.get(decision.status)?.push(decision);
+  for (const status of STATUS_ORDER) {
+    const group = groups.get(status) ?? [];
+    if (group.length === 0) continue;
+    process.stdout.write(`## ${status} (${group.length})\n`);
+    for (const d of group.sort((a, b) => a.id.localeCompare(b.id))) {
+      const overdue = d.reviewDate !== undefined && d.reviewDate !== null && d.reviewDate < now
+        && ["accepted", "building", "shipped", "measuring"].includes(d.status)
+        ? "  [review overdue]"
+        : "";
+      process.stdout.write(`${d.id}  ${d.title}${overdue}\n`);
+    }
+    process.stdout.write("\n");
+  }
+  const pending = decisions
+    .filter((d) => ["accepted", "building", "shipped", "measuring"].includes(d.status))
+    .filter((d) => d.reviewDate !== undefined && d.reviewDate !== null && d.reviewDate < now)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  if (pending.length > 0) {
+    process.stdout.write("Pending review:\n");
+    for (const d of pending) process.stdout.write(`${d.id}  review date ${d.reviewDate}\n`);
+    process.stdout.write("\n");
+  }
+  return 0;
+}
+
 async function cmdGuard(args: Args): Promise<number> {
   const repo = tryOpenRepo(args.flags);
   if (!repo?.initialized) return 1;
@@ -698,6 +732,7 @@ Usage:
   siftos show <DEC-XXXX>
   siftos context [<query>]
   siftos hooks
+  siftos status
   siftos hook enable|disable <hook>
   siftos ship <DEC-XXXX>
   siftos roadmap [--write]
@@ -733,6 +768,7 @@ export async function main(argv: string[]): Promise<number> {
       return result.healthy ? 0 : 1;
     }
     case "hooks": return cmdHooks(args);
+    case "status": return cmdStatus(args);
     case "hook": return cmdHook(args);
     case "ship": return cmdShip(args);
     case "roadmap": return cmdRoadmap(args);
