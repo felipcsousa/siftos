@@ -15,15 +15,77 @@ version: 0.3.0
 
 Product memory belongs to the repository, not to the AI vendor.
 
-Core loop:
+The user's goal is the work. SiftOS is decision support, not a gate.
+Default: help make and execute product decisions in the conversation —
+options, evidence, cheapest test, cost of error, verdict. Full PDR records
+are an explicit opt-in, proposed only when a decision is irreversible,
+expensive, or transversal, and always with the ceremony cost stated.
+
+## Default: prioritize
+
+When the user asks "what should we build" / "what's next" / "should we do X" —
+this is the default. Plain language, no ceremony, no records.
+
+Weigh candidates against strategy, constraint, evidence, cost, reversibility
+and learning value. Produce a ranked list:
 
 ```text
-Decision → Prediction → Outcome → Learning
+BUILD NOW     <bet> — <reasoning>
+DEFER         <bet> — <trigger>
+REJECT        <bet> — <reason>
 ```
 
-Automatic hooks are an optional orchestration layer. With every hook off,
-all explicit workflows still work. Installing or initializing SiftOS never
-enables hooks by itself.
+5–10 minutes. If the user picks BUILD NOW, log it in
+`.product/evidence/candidates.md` if worth remembering. Escalate to a full
+`decide` PDR only if irreversible/expensive/transversal — and state the
+ceremony cost (~30–60 min) first.
+
+## When to record
+
+Full PDR records (`decide`/`shape`) are an explicit opt-in, proposed only when
+a decision is irreversible, expensive, or transversal. State the ceremony cost
+(~30–60 min) and get explicit user consent before proceeding.
+
+Other workflows (`validate`, `challenge`, `diagnose`, `ship`, `review`) are
+available on demand but never triggered automatically unless the user asks.
+
+## Workflows
+
+Product memory and explicit workflow semantics are portable across OpenCode,
+Codex and DeepSeek Harness (dsh). Automatic lifecycle interception is
+harness-specific; do not claim hook parity where the platform does not expose
+an equivalent lifecycle point.
+
+| Workflow | When | Cost |
+|---|---|---|
+| `prioritize` | Default for "what to build" | 5–10 min, no records |
+| `decide` | Irreversible/expensive/transversal | ~30–60 min, full PDR |
+| `shape` | Idea → Bet with hypothesis | ~30–60 min, full PDR |
+| `validate` | Before results exist | ~15 min, contract record |
+| `challenge` | Adversarial review | ~10 min, no modification |
+| `diagnose` | Find highest-leverage issues | ~5 min, conversation |
+| `ship` | Ship Gate on accepted+ Bet | ~5 min, deterministic check |
+| `review` | Compare prediction vs outcome | ~15 min, record update |
+| `show` | Retrieve decision history | ~1 min, read-only |
+| `audit` | Decision health + linter | ~5 min, deterministic |
+| `init` | Build product context | progressive |
+| `hooks` | Inspect/change automation | reference |
+
+### Reference loading
+
+Resolve user intent to a workflow and load only the relevant references:
+
+- `decide` → `references/decision-protocol.md` + `references/decision-schema.md` + `references/evidence-rules.md`
+- `shape` → `references/shape.md` + `references/decision-schema.md`
+- `validate` → `references/validate.md`
+- `challenge` → `references/challenge-rules.md`
+- `prioritize` → `references/prioritize.md`
+- `diagnose` → `references/diagnose.md`
+- `ship` → `references/ship.md`
+- `review` → `references/review-protocol.md` + `references/decision-schema.md`
+- `audit` → `references/linter-rules.md`
+- `show` → deterministic search/status scripts
+- `hooks` → `references/hooks.md`
 
 ## Memory layout
 
@@ -44,45 +106,7 @@ enables hooks by itself.
 The skill lives in `.agents/skills/siftos/`. Never mix skill code and product
 memory.
 
-## Workflows
-
-Product memory and explicit workflow semantics are portable across OpenCode,
-Codex and DeepSeek Harness (dsh). Automatic lifecycle interception is
-harness-specific; do not claim hook parity where the platform does not expose
-an equivalent lifecycle point.
-
-| Workflow | What it does |
-| --- | --- |
-| `init` | Build persistent product context progressively. |
-| `decide` | Structure facts, evidence, assumptions, alternatives, recommendation, dissent and prediction. |
-| `shape` | Turn an idea into a Bet: problem, target user, hypothesis, SVT, scope, non-goals and measurement. |
-| `validate` | Define a Validation Contract before results exist. |
-| `challenge` | Adversarial review without modifying the PDR. |
-| `prioritize` | Compare Bets using strategy, constraint, evidence, cost, reversibility and learning value. |
-| `diagnose` | Find the highest-leverage product health issues. |
-| `ship` | Run the deterministic Ship Gate on an accepted+ Bet. |
-| `review` | Compare prediction with outcome and extract learning. |
-| `show` | Retrieve decision history. |
-| `audit` | Decision Health + deterministic linter findings. |
-| `hooks` | Inspect/change lifecycle automation. |
-
-### Invocation
-
-Resolve user intent to a workflow and load only the relevant references:
-
-- `decide` → `references/decision-protocol.md` + `references/decision-schema.md` + `references/evidence-rules.md`
-- `shape` → `references/shape.md` + `references/decision-schema.md`
-- `validate` → `references/validate.md`
-- `challenge` → `references/challenge-rules.md`
-- `prioritize` → `references/prioritize.md`
-- `diagnose` → `references/diagnose.md`
-- `ship` → `references/ship.md`
-- `review` → `references/review-protocol.md` + `references/decision-schema.md`
-- `audit` → `references/linter-rules.md`
-- `show` → deterministic search/status scripts
-- `hooks` → `references/hooks.md`
-
-## Automatic hooks
+## Hooks (optional)
 
 Before assuming automation exists, read the effective policy with
 `siftos hooks` (or `scripts/hooks.mjs`). The three states are distinct:
@@ -92,57 +116,29 @@ Installed ≠ Enabled ≠ Observed
 ```
 
 **Disabled means disabled.** Never run product enforcement the user turned
-off.
+off. Installing or initializing SiftOS never enables hooks by itself.
 
-Product Guard levels:
+Product Guard levels: L0 technical, L1 minor, L2 material, L3 strategic.
+In `advisory`, hooks never block. In `balanced`, unresolved L2/L3 production
+mutation gates until authorizing resolution. In `strict`, L2/L3 and unknown
+material mutations may require resolution.
 
-```text
-L0 technical
-L1 minor
-L2 material
-L3 strategic/high-impact
-```
-
-In `advisory`, automatic hooks never block. In `balanced`, unresolved L2/L3
-production mutation remains gated until an authorizing resolution exists. In
-`strict`, L2/L3 and unknown material mutations may require resolution.
-
-### Critical Guard invariant
-
-`block_issued` is only a UX flag. It is **never authorization**.
-
-Retrying a blocked mutation must remain blocked. Production mutation may
-proceed only when the current product intent has one of these authorizations:
-
-- `prototype` — exploratory implementation, not production commitment;
-- `existing_bet` — attach to a real accepted+ PDR/Bet;
-- `build_anyway` — explicit human bypass.
-
-`shape`, `validate` and `reconsider` are valid next steps, but they do not
-silently authorize production code. SiftOS-internal writes in `.product/` may
-proceed while production mutation remains gated.
+**Critical Guard invariant:** `block_issued` is a UX flag, never authorization.
+Production mutation proceeds only with: `prototype`, `existing_bet`, or
+`build_anyway` (explicit human bypass).
 
 ### Harness capabilities
 
-**Codex:** repository hooks implement SessionStart context, UserPromptSubmit
-intent state, PreToolUse mutation gating, PostToolUse footprint, PreCompact
-state preservation, Stop closeout/one continuation, and SessionEnd cleanup.
-Use native hook JSON contracts; do not emulate blocking with prose/exit codes.
+**Codex:** SessionStart context, UserPromptSubmit intent, PreToolUse gating,
+PostToolUse footprint, PreCompact state, Stop closeout, SessionEnd cleanup.
 
-**OpenCode:** the repository plugin implements native before/after tool hooks,
-session lifecycle observation, compaction context, and advisory closeout at
-idle. OpenCode currently has no documented 1:1 contract for Codex-style
-UserPromptSubmit context injection or Stop continuation. Do not pretend those
-capabilities exist; surface degraded behavior when relevant.
+**OpenCode:** native before/after tool hooks, lifecycle observation, compaction
+context, advisory closeout at idle. No documented 1:1 contract for
+Codex-style context injection or Stop continuation.
 
-**DeepSeek Harness (dsh):** the home-installed Cordis plugin implements the
-documented dsh lifecycle contracts: `agent/session-start` context capsule (and
-again on `source: "compact"`), `agent/pre-step` prompt-submit intent intake,
-`tools/pre-execute` mutation gating via `{ kind: "deny", reason }`,
-`tools/result` footprint tracking, `agent/turn-stopping` closeout with exactly
-one `agent.steer` continuation, and `agent/disposed` cleanup. dsh is a
-developer-preview harness: plugin APIs may change; `siftos doctor` reports
-installed artifacts, not assumed runtime fire.
+**DeepSeek Harness (dsh):** session-start capsule, pre-step intent intake,
+pre-execute mutation gating, result footprint, turn-stopping closeout with one
+`agent.steer` continuation, disposed cleanup. Developer-preview APIs.
 
 Hooks never make canonical product memory disposable. `.product/.runtime/`
 contains only reconstructable session state.

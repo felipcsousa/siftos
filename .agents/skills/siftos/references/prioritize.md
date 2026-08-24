@@ -1,17 +1,37 @@
-# Prioritize — ranking bets (PRD V2 §91)
+# Prioritize — ranking bets (PRD V2 §91) — the default for "what should we build now"
 
-Ranks candidate bets. No mandatory RICE/ICE score — judgment over
-frameworks (v0.2 §11.7). Scores are auxiliary and never replace argument.
+## When to use
 
-## Input
+Any moment the user asks "what do we build / what's next / should we do X".
+This is the cheapest enough tool: a ranking conversation, no record, no
+status transition. Use it before reaching for `decide`/`shape`.
 
-```text
-/siftos prioritize
-```
+## Flow (5–10 minutes, in conversation)
+
+1. Collect candidate bets from the user (ideas, issues, requests, debt).
+2. Weigh them using the criteria below — in **plain language**, no scores.
+3. Produce a ranked list, each line one verdict:
+
+   ```text
+   BUILD NOW     <bet> — <one-line reasoning + the SVT>
+   DEFER         <bet> — <trigger to reopen>
+   REJECT        <bet> — <reason>
+   ```
+
+4. If the user picks a BUILD NOW, that is a **conversation decision**; log
+   it (one line in `.product/evidence/candidates.md` if worth remembering).
+   Escalate to a full `decide` PDR only if irreversible/expensive/
+   transversal — and state the ceremony cost (~30–60 min) first.
+
+## Constraint first
+
+Read STRATEGY.md and METRICS.md. If the current constraint is activation
+(or traffic, retention...), a bet that relieves it beats an equal-upside
+bet that does not — say so explicitly.
 
 ## Criteria
 
-Weigh, in plain language, each candidate bet against:
+Weigh each candidate in plain language against:
 
 ```text
 Strategic fit        Does it move the current strategic objective?
@@ -25,17 +45,15 @@ Learning value       What it teaches even on failure.
 Dependencies         What blocks it / what it unblocks.
 ```
 
-## Output
+The **output is verdict + trigger, not a rank**: each line is BUILD NOW,
+DEFER, or REJECT. Judgment over frameworks — no mandatory RICE/ICE score
+(v0.2 §11.7). Do not rank by unweighted counts of criteria.
 
-A ranked list with one-line reasoning per bet, then a recommendation of
-the top 1–2 with the reasoning spelled out. Do not rank by unweighted
-counts of criteria.
+## Input
 
-## Constraint first
-
-Read STRATEGY.md and METRICS.md. If the current constraint is activation,
-a bet that relieves activation beats an equal-expected-upside bet that
-does not — say so explicitly.
+```text
+/siftos prioritize
+```
 
 ## Non-goals
 
