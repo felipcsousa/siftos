@@ -3,7 +3,7 @@ id: DEC-0003
 title: Focus next two weeks on content-driven distribution
 status: accepted
 created_at: 2026-08-21
-updated_at: 2026-08-21
+updated_at: 2026-08-24
 owner: siftos-team
 tags:
   - distribution
@@ -107,7 +107,8 @@ DEC-0002 funnel: npm monthly downloads delta, new stars, external issues — che
 ## Guardrails
 
 - DEC-0002 contract thresholds unchanged (≥ 5 stars AND ≥ 2 issues by 2026-11-16).
-- Zero new features built before 2026-11-16.
+- Zero new features built before 2026-11-16 (amended by DEC-0006, 2026-08-24: replaced by the guardrail below).
+- No expansion features until adoption resolves (DEC-0006, 2026-08-24): utility improvements, ceremony reduction, behavioral evals, product-judgment improvements and onboarding simplification are permitted; new harnesses, new governance machinery, new analytics, new workflows unrelated to utility and new lifecycle features remain prohibited (0 new categories).
 - 0 fabricated claims in content.
 
 ## Reversibility
@@ -163,4 +164,4 @@ Unknown.
 
 ## Follow-up Decisions
 
-Unknown.
+- Amended by DEC-0006 (2026-08-24): the zero-features moratorium is replaced by "no expansion features until adoption resolves". Utility improvements, ceremony reduction, behavioral evals, product-judgment improvements and onboarding simplification are permitted; expansion features remain prohibited. V0.4 PR A is executed under this amendment.

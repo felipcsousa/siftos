@@ -1,7 +1,7 @@
 ---
 id: DEC-0005
 title: Add critique command — quantitative product health score
-status: validating
+status: superseded
 created_at: 2026-08-24
 updated_at: 2026-08-24
 owner: siftos-team
@@ -17,7 +17,7 @@ reversibility: high
 cost_of_delay: low
 review_date: 2026-11-18
 supersedes: null
-superseded_by: null
+superseded_by: DEC-0006
 agent_workflow_version: decide-v1
 ---
 # Decision
@@ -147,6 +147,10 @@ Low: the SVT costs one session; the command cannot be built before 2026-11-16 an
 
 2026-11-18 — with DEC-0002 resolved, decide whether to build the critique command (accepted → building) or drop it (cancelled), based on the SVT outcome and whether the guardrail lifted.
 
+## Final Human Decision
+
+Confirmed by human on 2026-08-24: V0.4 (DEC-0006) supersedes this design. The product-health/compliance critique score is not implemented; the artifact critique (rewritten skill/references/critique.md) replaces it.
+
 # Outcome
 
 ## Observed Result
@@ -184,3 +188,5 @@ Unknown.
 - Build of the critique command is deferred until the DEC-0003 guardrail lifts (2026-11-16) or DEC-0002 resolves.
 - SKILL.md workflow-table entry and CLI subcommand are part of the build, not shaping: listing `critique` in the prompt before the command exists would violate non-negotiable rule 13 (capability claims must be executable). The design lives in skill/references/critique.md as a shaping artifact until then.
 - Reference file skill/references/critique.md written 2026-08-24 as the validated design.
+
+- Superseded by DEC-0006 (2026-08-24, V0.4 Judgment First). Original critique design: product-health/compliance scoring (memory completeness, decision quality, validation rigor, learning capture, strategy alignment). V0.4 decision: do not implement. Reason: scores tool usage rather than product work and risks Goodhart/compliance behavior. Replacement: artifact/product critique — skill/references/critique.md rewritten to evaluate the work (spec, PRD, PR, diff) across 6 dimensions; diagnose + audit cover operational health.

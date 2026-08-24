@@ -1,33 +1,75 @@
-# Prioritize — ranking bets (PRD V2 §91) — the default for "what should we build now"
+# Prioritize — ranking bets (V0.4) — the default for "what should we do"
 
-## When to use
-
-Any moment the user asks "what do we build / what's next / should we do X".
-This is the cheapest enough tool: a ranking conversation, no record, no
-status transition. Use it before reaching for `decide`/`shape`.
+The cheapest enough tool: a ranking conversation, no score, no record, no
+state transition. The default for any moment the user asks "what do we
+build / what's next / should we do X".
 
 ## Flow (5–10 minutes, in conversation)
 
 1. Collect candidate bets from the user (ideas, issues, requests, debt).
-2. Weigh them using the criteria below — in **plain language**, no scores.
-3. Produce a ranked list, each line one verdict:
+2. Weigh them in plain language against the current constraint.
+3. Produce a ranked list, each entry one verdict:
 
    ```text
-   BUILD NOW     <bet> — <one-line reasoning + the SVT>
-   DEFER         <bet> — <trigger to reopen>
-   REJECT        <bet> — <reason>
+   BUILD NOW
+   <bet> — <reasoning + cheapest useful move>
+
+   DEFER
+   <bet> — <trigger to reopen>
+
+   REJECT
+   <bet> — <reason>
    ```
 
-4. If the user picks a BUILD NOW, that is a **conversation decision**; log
-   it (one line in `.product/evidence/candidates.md` if worth remembering).
-   Escalate to a full `decide` PDR only if irreversible/expensive/
-   transversal — and state the ceremony cost (~30–60 min) first.
+4. The human picks. Only an **effective human choice** can become memory —
+   never auto-log candidates during exploration.
+
+Escalate to a full `decide` PDR only if the picked bet is
+irreversible/expensive/transversal — and state the ceremony cost
+(~30–60 min) before proposing it. Compact product memory is the default
+home for durable choices when it exists.
+
+## BUILD NOW always answers "why not the obvious alternative?"
+
+For every BUILD NOW, name the strongest candidate you rejected and why the
+chosen bet beats it. If the alternative is close, say so:
+
+```text
+BUILD NOW
+Improve activation instrumentation
+— Current constraint is activation and we cannot reliably evaluate the
+onboarding bets without a baseline.
+— Cheapest useful move: instrument trial_started → activated.
+
+DEFER
+Referral loop
+— Reopen when activation baseline is stable.
+
+REJECT
+Dashboard redesign
+— No evidence it relieves the current constraint.
+```
+
+## Zero BUILD NOW is a valid answer
+
+If no candidate has enough evidence or leverage:
+
+```text
+BUILD NOW
+Nothing yet.
+
+TEST FIRST
+<cheapest credible test that would create a BUILD NOW>
+```
+
+This prevents feature-factory bias: not every list needs a winner.
 
 ## Constraint first
 
 Read STRATEGY.md and METRICS.md. If the current constraint is activation
 (or traffic, retention...), a bet that relieves it beats an equal-upside
-bet that does not — say so explicitly.
+bet that does not — say so explicitly. If no context exists, state the
+assumption and the confidence level instead of blocking.
 
 ## Criteria
 
@@ -45,17 +87,15 @@ Learning value       What it teaches even on failure.
 Dependencies         What blocks it / what it unblocks.
 ```
 
-The **output is verdict + trigger, not a rank**: each line is BUILD NOW,
-DEFER, or REJECT. Judgment over frameworks — no mandatory RICE/ICE score
-(v0.2 §11.7). Do not rank by unweighted counts of criteria.
+**The output is verdict + trigger, not a rank.** Judgment over frameworks —
+no mandatory RICE/ICE score. Do not rank by unweighted counts of criteria.
 
 ## Input
 
-```text
-/siftos prioritize
-```
+Natural language: "what should we do this week?", "prioritize my backlog."
+
 
 ## Non-goals
 
-Prioritize does not create a roadmap (see `roadmap.md`) and does not
-decide for the human. It proposes; the human picks.
+Prioritize does not create a roadmap and does not decide for the human. It
+proposes; the human picks. It never records candidates automatically.

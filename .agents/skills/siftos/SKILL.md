@@ -1,91 +1,184 @@
 ---
 name: siftos
 description: >-
-  SiftOS — Product Decision Intelligence. Persistent product context plus a
-  structured decision protocol (decide, shape, validate, challenge, record,
-  review, ship, learn) and optional user-configurable lifecycle hooks for AI
-  coding agents. Use for product decisions, bets, validation, challenge,
-  prioritization, diagnosis, Ship Gate, outcomes, decision history, audits,
-  or hook configuration. Product memory lives in .product/ (Markdown + Git).
-  Human owns the decision; automation is always user-chosen.
+  SiftOS — Product judgment for coding agents. Gives agents persistent
+  product context (strategy, evidence, prior decisions, learnings) and
+  uses it to prioritize work, critique ideas, catch contradictions and
+  improve product decisions in the conversation. Use for "what should we
+  build", "critique this spec/PRD/PR", "does this align with our
+  strategy", "did it work", product-aware implementation preflight, and
+  durable product memory. Product memory lives in .product/ (Markdown +
+  Git). Human owns the decision; automation is always user-chosen.
 version: 0.3.0
 ---
 
 # SiftOS
 
-Product memory belongs to the repository, not to the AI vendor.
+SiftOS gives coding agents product judgment grounded in this product's
+strategy, evidence, prior decisions and learnings.
 
-The user's goal is the work. SiftOS is decision support, not a gate.
-Default: help make and execute product decisions in the conversation —
-options, evidence, cheapest test, cost of error, verdict. Full PDR records
-are an explicit opt-in, proposed only when a decision is irreversible,
-expensive, or transversal, and always with the ceremony cost stated.
+The user's work is always primary. SiftOS is judgment, not gatekeeping:
+it helps the user build better product, and remembers what matters without
+getting in the way.
 
-## Default: prioritize
+## Default behavior
 
-When the user asks "what should we build" / "what's next" / "should we do X" —
-this is the default. Plain language, no ceremony, no records.
+1. Understand the actual product question.
+2. Retrieve only relevant product context.
+3. Give the useful judgment first.
+4. Help act on it.
+5. Persist only durable information worth future retrieval.
 
-Weigh candidates against strategy, constraint, evidence, cost, reversibility
-and learning value. Produce a ranked list:
+Never ask the user to choose a SiftOS workflow — resolve intent internally.
+
+## Core capabilities
+
+Four hero capabilities, all in conversation. No commands to learn, no
+records required.
+
+### Prioritize — "What should we do?"
+
+Rank candidates against the current constraint: BUILD NOW / DEFER /
+REJECT. No scores, no records. → `references/prioritize.md`
+
+### Critique — "Is this actually good?"
+
+Score a spec, PRD, roadmap, feature, PR, diff or existing implementation
+0–100 across six judgment dimensions, surface at most three issues, end
+with a concrete action. Never a gate; nothing persisted by default.
+→ `references/critique.md`
+
+### Align — "Does this make sense for this product?"
+
+Check the change against strategy, prior decisions and learnings:
+ALIGNED / TENSION / CONFLICT / INSUFFICIENT CONTEXT. Includes the
+product-aware implementation preflight. → `references/align.md`
+
+### Review — "What did we actually learn?"
+
+Compare prediction vs outcome and carry the learning forward.
+→ `references/review-protocol.md`
+
+Natural language maps to capabilities:
+
+> "Should we build referral next?" → prioritize
+> "Critique this PRD." → critique
+> "Does this PR make sense given our activation goal?" → align
+> "We shipped this last month, did it work?" → review
+> "Implement mandatory card collection on trial." → product-aware preflight, then execution
+
+Shared judgment principles for all of them:
+`references/product-judgment.md`.
+
+## Durable memory
+
+Memory is silent infrastructure. Most durable decisions and learnings
+belong in compact entries with zero ceremony; full PDRs are the exception.
+
+- **Write eligibility.** Only: human-committed decisions ("let's go with
+  B"), observed learnings ("the experiment did not improve activation"),
+  confirmed durable constraints, or evidence that will change future
+  decisions. Brainstorming is never memory.
+- **Persistence rule.** The value of remembering must exceed the cost of
+  future retrieval. If it will not change a future decision, do not
+  persist it.
+- **Full PDR (`decide`)** is explicit opt-in, proposed only for
+  irreversible, expensive, transversal, pricing/business-model or
+  constitutional decisions — with the ceremony cost stated (~30–60 min)
+  and explicit human consent before any record is created. Compact memory
+  remains a valid choice even then.
+- **No automatic persistence.** No candidate logs, no critique snapshots,
+  no records from exploration. Only the user's effective choice can become
+  memory. Compact product memory (`MEMORY.md`) is the default home for
+  durable entries and ships in the next iteration. Today durable decisions
+  worth preserving are proposed as explicit PDR opt-ins (decide) or not
+  persisted; no automatic persistence, no candidate logs.
+
+## Ceremony Budget
+
+For normal interactions:
+
+- 0 questions about "workflow";
+- 0 lifecycle explanations;
+- 0 mentions of Guard/hooks/status unless relevant or requested;
+- at most one process sentence before delivering judgment;
+- never ask the user to fill fields to satisfy a schema;
+- never create a PDR before the recommendation;
+- at most three priority issues in critique/diagnose;
+- no checklist dumps;
+- `Unknown.` degrades confidence, never utility.
+
+Missing context:
 
 ```text
-BUILD NOW     <bet> — <reasoning>
-DEFER         <bet> — <trigger>
-REJECT        <bet> — <reason>
+Bad:  "METRICS.md has Unknown activation baseline. Please initialize SiftOS first."
+Good: "I'd favor A, but confidence is medium because I couldn't find an
+       activation baseline. If activation is still the current constraint,
+       A dominates B."
 ```
 
-5–10 minutes. If the user picks BUILD NOW, log it in
-`.product/evidence/candidates.md` if worth remembering. Escalate to a full
-`decide` PDR only if irreversible/expensive/transversal — and state the
-ceremony cost (~30–60 min) first.
+## Advanced
 
-## When to record
-
-Full PDR records (`decide`/`shape`) are an explicit opt-in, proposed only when
-a decision is irreversible, expensive, or transversal. State the ceremony cost
-(~30–60 min) and get explicit user consent before proceeding.
-
-Other workflows (`validate`, `challenge`, `diagnose`, `ship`, `review`) are
-available on demand but never triggered automatically unless the user asks.
-
-## Workflows
-
-Product memory and explicit workflow semantics are portable across OpenCode,
-Codex and DeepSeek Harness (dsh). Automatic lifecycle interception is
-harness-specific; do not claim hook parity where the platform does not expose
-an equivalent lifecycle point.
+Workflows available on demand, never the default interface:
 
 | Workflow | When | Cost |
 |---|---|---|
-| `prioritize` | Default for "what to build" | 5–10 min, no records |
-| `decide` | Irreversible/expensive/transversal | ~30–60 min, full PDR |
+| `decide` | Full PDR for high-stakes decisions | ~30–60 min, opt-in |
 | `shape` | Idea → Bet with hypothesis | ~30–60 min, full PDR |
-| `validate` | Before results exist | ~15 min, contract record |
-| `challenge` | Adversarial review | ~10 min, no modification |
-| `diagnose` | Find highest-leverage issues | ~5 min, conversation |
-| `ship` | Ship Gate on accepted+ Bet | ~5 min, deterministic check |
-| `review` | Compare prediction vs outcome | ~15 min, record update |
+| `validate` | Define test criteria before results exist | ~15 min, contract |
+| `challenge` | Adversarial review of a record | ~10 min, read-only |
+| `diagnose` | Overall product state, top 3 issues | ~5 min, conversation |
+| `audit` | Deterministic integrity check | ~5 min |
+| `ship` | Ship Gate on accepted+ bet | ~5 min, deterministic |
+| `review` | Full PDR prediction vs outcome | ~15 min, record update |
 | `show` | Retrieve decision history | ~1 min, read-only |
-| `audit` | Decision health + linter | ~5 min, deterministic |
 | `init` | Build product context | progressive |
 | `hooks` | Inspect/change automation | reference |
 
 ### Reference loading
 
-Resolve user intent to a workflow and load only the relevant references:
+Resolve user intent; load only the relevant references:
 
+- `prioritize` → `references/prioritize.md`
+- `critique` → `references/critique.md`
+- `align` → `references/align.md`
 - `decide` → `references/decision-protocol.md` + `references/decision-schema.md` + `references/evidence-rules.md`
 - `shape` → `references/shape.md` + `references/decision-schema.md`
 - `validate` → `references/validate.md`
 - `challenge` → `references/challenge-rules.md`
-- `prioritize` → `references/prioritize.md`
 - `diagnose` → `references/diagnose.md`
 - `ship` → `references/ship.md`
 - `review` → `references/review-protocol.md` + `references/decision-schema.md`
 - `audit` → `references/linter-rules.md`
 - `show` → deterministic search/status scripts
 - `hooks` → `references/hooks.md`
+
+Any judgment interaction may also load
+`references/product-judgment.md`.
+
+### Hooks (optional)
+
+Before assuming automation exists, read the effective policy with
+`siftos hooks` (or `scripts/hooks.mjs`). The three states are distinct:
+
+```text
+Installed ≠ Enabled ≠ Observed
+```
+
+**Disabled means disabled.** Never run product enforcement the user turned
+off. Installing or initializing SiftOS never enables hooks by itself.
+
+Product Guard levels: L0 technical, L1 minor, L2 material, L3 strategic.
+In `advisory`, hooks never block. In `balanced`, unresolved L2/L3
+production mutation gates until authorizing resolution. In `strict`, L2/L3
+and unknown material mutations may require resolution.
+
+**Critical Guard invariant:** `block_issued` is a UX flag, never
+authorization. Production mutation proceeds only with: `prototype`,
+`existing_bet`, or `build_anyway` (explicit human bypass).
+
+Harness capabilities and lifecycle events: `references/hooks.md`. Hook
+behavior is frozen in V0.4 — no new adapters, events or presets.
 
 ## Memory layout
 
@@ -103,45 +196,8 @@ Resolve user intent to a workflow and load only the relevant references:
 └── .index/          derived, gitignored
 ```
 
-The skill lives in `.agents/skills/siftos/`. Never mix skill code and product
-memory.
-
-## Hooks (optional)
-
-Before assuming automation exists, read the effective policy with
-`siftos hooks` (or `scripts/hooks.mjs`). The three states are distinct:
-
-```text
-Installed ≠ Enabled ≠ Observed
-```
-
-**Disabled means disabled.** Never run product enforcement the user turned
-off. Installing or initializing SiftOS never enables hooks by itself.
-
-Product Guard levels: L0 technical, L1 minor, L2 material, L3 strategic.
-In `advisory`, hooks never block. In `balanced`, unresolved L2/L3 production
-mutation gates until authorizing resolution. In `strict`, L2/L3 and unknown
-material mutations may require resolution.
-
-**Critical Guard invariant:** `block_issued` is a UX flag, never authorization.
-Production mutation proceeds only with: `prototype`, `existing_bet`, or
-`build_anyway` (explicit human bypass).
-
-### Harness capabilities
-
-**Codex:** SessionStart context, UserPromptSubmit intent, PreToolUse gating,
-PostToolUse footprint, PreCompact state, Stop closeout, SessionEnd cleanup.
-
-**OpenCode:** native before/after tool hooks, lifecycle observation, compaction
-context, advisory closeout at idle. No documented 1:1 contract for
-Codex-style context injection or Stop continuation.
-
-**DeepSeek Harness (dsh):** session-start capsule, pre-step intent intake,
-pre-execute mutation gating, result footprint, turn-stopping closeout with one
-`agent.steer` continuation, disposed cleanup. Developer-preview APIs.
-
-Hooks never make canonical product memory disposable. `.product/.runtime/`
-contains only reconstructable session state.
+The skill lives in `.agents/skills/siftos/`. Never mix skill code and
+product memory.
 
 ## Non-negotiable rules
 
@@ -161,16 +217,17 @@ contains only reconstructable session state.
 
 ## Schema failure protocol
 
-Validate structured workflow output before persistence. Repair once; if still
-invalid, fail explicitly. Never persist partially corrupted product memory.
+Validate structured workflow output before persistence. Repair once; if
+still invalid, fail explicitly. Never persist partially corrupted product
+memory.
 
 ## Git
 
-After creating/updating a PDR, show the path and ask the user to review the
-diff. Never `git commit` automatically.
+After creating/updating a PDR, show the path and ask the user to review
+the diff. Never `git commit` automatically.
 
 ## Scope
 
-SiftOS is not a backlog, analytics or project-management replacement. If an
-action does not improve the ability to make, preserve, contest, measure or
-learn from a product decision, it does not belong here.
+SiftOS is not a backlog, analytics or project-management replacement. If
+an action does not improve the ability to make, judge or learn from a
+product decision, it does not belong here.

@@ -1,105 +1,138 @@
-# Critique — quantitative product health score (DEC-0005, validated 2026-08-24)
+# Critique — artifact critique (V0.4)
 
-Scores the product setup + recent decisions, persists snapshots for trend,
-and maps top improvements to executable SiftOS commands. The chat response
-is the deliverable; the snapshot is the backlog for later runs.
+**Hero capability.** Evaluates the quality of the work artifact — not the
+health of the SiftOS setup. Supersedes the DEC-0005 product-health/compliance
+score design (see DEC-0006): scores tool usage rather than product work and
+risks Goodhart/compliance behavior. `diagnose` + `audit` cover operational
+health; critique covers the work.
 
-**Status: design validated (SVT PASS 2026-08-24), not built.** The command
-is not yet in the CLI or the SKILL.md workflow table (non-negotiable rule 13:
-capability claims must be executable). Build is deferred until the DEC-0003
-guardrail lifts (2026-11-16) or DEC-0002 resolves.
+## When to use
 
-## Invocation
+Any moment the user asks for a judgment on concrete work:
+
+- an idea;
+- a feature;
+- a PRD or spec;
+- a roadmap;
+- a strategic proposal;
+- an experiment;
+- a decision record;
+- an issue;
+- a PR;
+- a diff;
+- an existing implementation;
+- text provided in the conversation.
+
+## Flow
 
 ```text
-/siftos critique
+critique artifact
+      ↓
+top issues (≤ 3)
+      ↓
+user: "fix it"
+      ↓
+rewrite / patch / rescope the artifact
+      ↓
+re-critique
 ```
 
-Runs against the whole product setup: memory files (PRODUCT, STRATEGY,
-METRICS, PRINCIPLES, ROADMAP) + decision records (`decisions/`).
+Critique is never analysis-only: the report ends with a concrete action
+offer ("I can rewrite this spec around that test now.").
 
-## Dimensions
+## Rubric
 
-Each dimension scores 0-100. Scores are directional, not objective truth —
-the output must display the label "directional, not objective truth" within
-the first 10 lines of the score block.
+Directional score 0–100, weighted across six dimensions. The score is
+**never a gate** and never a product KPI.
+
+| Dimension | Weight | Question |
+| --- | ---: | --- |
+| Problem & User Value | 20 | Are we solving a real, important problem? |
+| Strategy & Leverage | 20 | Does this move the current objective/constraint? |
+| Evidence & Uncertainty | 15 | What supports the bet and what is still inference? |
+| Solution & Scope | 15 | Is the solution proportional, focused, plausible? |
+| Measurement & Learning | 15 | Will we know if it worked? Learn even on failure? |
+| Cost & Reversibility | 15 | Right price to pay to reduce this uncertainty? |
+
+The dimensions evaluate **the work**. They never evaluate whether a PDR
+exists, whether METRICS.md is complete, or whether the user followed SiftOS.
+
+## Verdicts
 
 ```text
-Memory completeness   memory files present, filled, and current
-Decision quality      weighted Decision Quality Score per record, aggregated
-Validation rigor      active bets with quantified contracts, metrics baselines, guardrails
-Learning capture      outcomes recorded, learnings extracted, review discipline
-Strategy alignment    decisions linked to goal/strategy, bets on the roadmap
+BUILD NOW        strong on the dimensions that matter
+TEST FIRST       cheap credible test before building
+DEFER AS WRITTEN needs reshaping; the object is not ready
+REJECT           no evidence of a real problem or leverage
 ```
-
-Sources (deterministic where possible, judgment where required):
-
-- `scripts/audit.mjs` — reviewed rate, missing metrics, missing
-  alternatives, low-confidence decisions.
-- `scripts/status.mjs` — lifecycle distribution, stale bets
-  (review_date passed, not reviewed).
-- `validate.mjs` — schema/linter findings per record.
-- The Decision Quality Score weights in `references/linter-rules.md`
-  (Problem/goal 15, Evidence 15, Alternatives 15, Assumptions 10,
-  Dissent 10, Outcome 15, Guardrail 5, Revisit condition 10,
-  Human decision 5) — aggregated across records for the Decision
-  quality dimension.
-- Judgment over memory files: currency (ROADMAP derived state vs real
-  state), metric targets defined vs `Unknown.`, principle conflicts.
-- Learning capture from records: count of `# Outcome` sections with
-  content vs `Unknown.`; review_date discipline (stale vs reviewed).
 
 ## Output
 
 ```text
-SiftOS Critique — YYYY-MM-DD
+CRITIQUE — 61 / 100
+Verdict: DEFER AS WRITTEN
 
-  Memory completeness     ███████░░░  70
-  Decision quality        █████████░  85
-  Validation rigor        ██████░░░░  65
-  Learning capture        █████░░░░░  35
-  Strategy alignment      █████████░  85
+Problem & User Value      82
+Strategy & Leverage       76
+Evidence & Uncertainty    35
+Solution & Scope          64
+Measurement & Learning    41
+Cost & Reversibility      72
 
-  Total                   ███████░░░  68 / 100  (Acceptable→Good)
-  Directional, not objective truth — judgment over frameworks.
+What survives
+- The activation problem is real and aligned with the current objective.
+- Removing one onboarding step is directionally plausible.
 
-Top 3 improvements:
-1. Learning capture (35) — evidence: DEC-0002/0003/0004 outcomes Unknown,
-   0 waiting for review
-   → Run `review DEC-0003` (revisit 2026-09-18), `review DEC-0004` (2026-09-21)
-   → Expected: dimension to ~60 when outcomes are recorded
-2. Validation rigor (65) — evidence: METRICS.md Target Unknown
-   → Define primary-metric targets and activation baselines in METRICS.md
-   → Expected: ~80
-3. Memory completeness (70) — evidence: ROADMAP.md lists a reviewed record
-   → Run `siftos roadmap --write`
-   → Expected: ~85
+Top issues
+
+1. The proposed solution outruns the evidence.
+   We know activation is weak, but not that the credit-card step is
+   the dominant cause.
+
+2. There is no observable success threshold.
+   "Improves activation" is not enough to judge the bet.
+
+3. The implementation is larger than the uncertainty warrants.
+   We can test the mechanism without rebuilding checkout.
+
+Recommendation
+
+TEST FIRST.
+
+Cheapest credible test:
+Remove the card requirement for 20% of new trials and compare
+trial_started → activated against control.
+
+What would change my verdict:
+A meaningful activation lift without a material drop in qualified conversion.
 ```
 
 Rules:
 
-- At most 3 improvements. More than that is noise (same rule as diagnose).
-- Every improvement cites evidence from this repo and names a specific
-  command plus the expected score effect. If an improvement cannot name
-  all three, it is not a top improvement.
-- The score is read-only: no state transitions, no Ship Gate coupling in
-  v1. Critique is a dashboard, not a gate.
-- `Unknown.` is a legitimate finding; never invent baselines or outcomes.
-- A total ≥ 85 while 2+ records lack recorded outcomes (learning capture
-  ≤ 40) is a weight-model alert: recompute the total with evidence, never
-  ship a misleading high score.
+- At most 3 top issues. More than that is noise (same rule as diagnose).
+- Every issue cites evidence from the artifact or product context; never
+  invent baselines or outcomes.
+- The report ends with action, not process.
+- `Unknown.` is a finding; it degrades confidence, never the report's
+  usefulness.
 
-## Snapshot + trend
+## Persistence
 
-Persist each run to `.product/evidence/critique/YYYY-MM-DD.md` (frontmatter
-with dimension scores + total; body with the full report). Trend = last 5
-snapshots, printed after the report:
+**No persistence by default.** A critique writes nothing. Only an explicit
+request preserves the report (e.g. "please save this critique"); even that is
+optional, never automatic. A preserved critique is a report the user asked
+for, not a collector artifact.
 
-```text
-Trend for product setup (last 5 runs): 68 → ...
-```
+## Distinctions
 
-## Close
+- `critique` = evaluation of the current work.
+- `diagnose` = diagnosis of the overall product state (max 3 high-leverage
+  issues, conversation, no score).
+- `challenge` = adversarial review of a single decision record.
+- `audit` = deterministic integrity check.
 
-The run ends with a question: which dimension to attack first, offering the
-2-3 lowest-scoring dimensions as options. Never end on the report alone.
+## Non-goals
+
+- Critique does not gate anything (no Ship Gate coupling).
+- Critique does not rank people or teams.
+- Critique does not measure SiftOS usage or setup health.

@@ -10,3 +10,6 @@ npm-debug.log*
 site/.astro/
 site/dist/
 site/node_modules/
+
+# Judgment eval run artifacts
+evals/judgment/outputs/
